@@ -1,0 +1,5 @@
+{
+  "name": "Alumni Bookkeeping App",
+  "description": "An application for alumni to manage class dues, donations, and event payments, track their transaction history, and stay updated on class announcements. Administrators can manage transactions, import data, and post updates.",
+  "requestFramePermissions": []
+}
