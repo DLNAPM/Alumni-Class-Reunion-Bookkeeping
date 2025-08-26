@@ -75,4 +75,5 @@ export interface DataContextType {
   classBalance: number;
   integrationSettings: IntegrationSettings;
   updateIntegrationSettings: (service: keyof IntegrationSettings, settings: IntegrationService) => void;
+  updateUserName: (newName: string) => void;
 }

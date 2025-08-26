@@ -8,6 +8,7 @@ import Admin from './components/Admin';
 import Reporting from './components/Reporting';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
+import Profile from './components/Profile';
 import type { User, Transaction, Announcement, IntegrationSettings, IntegrationService } from './types';
 import { generateMockTransactions } from './services/mockData';
 
@@ -84,6 +85,15 @@ const App: React.FC = () => {
     setAnnouncements(prev => prev.filter(a => a.id !== announcementId));
   }, []);
 
+  const updateUserName = useCallback((newName: string) => {
+    setUser(currentUser => {
+      if (currentUser) {
+        return { ...currentUser, name: newName };
+      }
+      return null;
+    });
+  }, []);
+
 
   const dataProviderValue = useMemo(() => ({
     user,
@@ -102,7 +112,8 @@ const App: React.FC = () => {
     classBalance: transactions.reduce((acc, t) => acc + t.amount, 0),
     integrationSettings,
     updateIntegrationSettings,
-  }), [user, logo, subtitle, transactions, announcements, addTransaction, updateTransaction, deleteTransaction, clearTransactions, addAnnouncement, deleteAnnouncement, integrationSettings, updateIntegrationSettings]);
+    updateUserName,
+  }), [user, logo, subtitle, transactions, announcements, addTransaction, updateTransaction, deleteTransaction, clearTransactions, addAnnouncement, deleteAnnouncement, integrationSettings, updateIntegrationSettings, updateUserName]);
 
   const renderPage = () => {
     switch (currentPage) {
@@ -112,6 +123,8 @@ const App: React.FC = () => {
         return <MakePayment />;
       case 'transactions':
         return <Transactions />;
+      case 'profile':
+        return <Profile />;
       case 'admin':
         return user?.isAdmin ? <Admin /> : <Dashboard />; // Fallback to dashboard if not admin
       case 'reporting':
