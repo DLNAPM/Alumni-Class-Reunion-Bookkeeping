@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useData } from '../context/DataContext';
 import { PaymentCategory, Transaction, Announcement } from '../types';
 
 // Generic card component for the admin panel sections
-const AdminCard: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+const AdminCard: React.FC<{ title: string; children: React.ReactNode; borderColor?: string }> = ({ title, children, borderColor = 'border-b' }) => (
   <div className="bg-white p-6 rounded-lg shadow-md">
-    <h3 className="text-xl font-semibold mb-4 text-brand-text border-b pb-2">{title}</h3>
+    <h3 className={`text-xl font-semibold mb-4 text-brand-text ${borderColor} pb-2`}>{title}</h3>
     {children}
   </div>
 );
@@ -63,10 +63,15 @@ const EditTransactionModal: React.FC<{
 
 
 const Admin: React.FC = () => {
-  const { transactions, addTransaction, updateTransaction, deleteTransaction, addAnnouncement, setLogo, subtitle, setSubtitle } = useData();
+  const { transactions, addTransaction, updateTransaction, deleteTransaction, clearTransactions, announcements, addAnnouncement, deleteAnnouncement, setLogo, subtitle, setSubtitle } = useData();
   
   const [manualTx, setManualTx] = useState({ classmateName: '', amount: '', category: PaymentCategory.Dues, description: '' });
   const [announcement, setAnnouncement] = useState({ title: '', content: '' });
+  const [announcementImage, setAnnouncementImage] = useState<File | null>(null);
+  const [announcementImagePreview, setAnnouncementImagePreview] = useState<string | null>(null);
+  const announcementImageInputRef = useRef<HTMLInputElement>(null);
+
+  const [fbPost, setFbPost] = useState({ title: '', url: '' });
   const [uploadStatus, setUploadStatus] = useState<Record<string, string>>({});
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -80,6 +85,26 @@ const Admin: React.FC = () => {
     const { name, value } = e.target;
     setAnnouncement(prev => ({ ...prev, [name]: value }));
   };
+  
+  const handleAnnouncementImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+          const file = e.target.files[0];
+          setAnnouncementImage(file);
+          const reader = new FileReader();
+          reader.onloadend = () => {
+              setAnnouncementImagePreview(reader.result as string);
+          };
+          reader.readAsDataURL(file);
+      } else {
+          setAnnouncementImage(null);
+          setAnnouncementImagePreview(null);
+      }
+  };
+
+  const handleFbPostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFbPost(prev => ({...prev, [name]: value }));
+  }
 
   const handleManualTxSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,18 +120,57 @@ const Admin: React.FC = () => {
       setManualTx({ classmateName: '', amount: '', category: PaymentCategory.Dues, description: '' });
     }
   };
+  
+  const resetAnnouncementForm = () => {
+      alert('Announcement posted successfully!');
+      setAnnouncement({ title: '', content: '' });
+      setAnnouncementImage(null);
+      setAnnouncementImagePreview(null);
+      if (announcementImageInputRef.current) {
+          announcementImageInputRef.current.value = "";
+      }
+  };
 
   const handleAnnouncementSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if(announcement.title && announcement.content) {
-          addAnnouncement({
+          const newAnnouncementData: Omit<Announcement, 'id'> = {
               title: announcement.title,
               content: announcement.content,
               date: new Date().toISOString().split('T')[0],
-          });
-          alert('Announcement posted successfully!');
-          setAnnouncement({ title: '', content: '' });
+              type: 'text',
+          };
+
+          if (announcementImage) {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                  addAnnouncement({
+                      ...newAnnouncementData,
+                      imageUrl: reader.result as string,
+                  });
+                  resetAnnouncementForm();
+              };
+              reader.readAsDataURL(announcementImage);
+          } else {
+              addAnnouncement(newAnnouncementData);
+              resetAnnouncementForm();
+          }
       }
+  };
+  
+  const handleFbPostSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (fbPost.title && fbPost.url) {
+      addAnnouncement({
+        title: fbPost.title,
+        content: `Facebook Post: ${fbPost.url}`, // For fallback
+        date: new Date().toISOString().split('T')[0],
+        type: 'facebook',
+        url: fbPost.url,
+      });
+      alert('Facebook post embedded successfully!');
+      setFbPost({ title: '', url: '' });
+    }
   };
   
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
@@ -135,11 +199,24 @@ const Admin: React.FC = () => {
       }, 2500);
   };
   
-  const handleDelete = (transactionId: number) => {
+  const handleDeleteTx = (transactionId: number) => {
     if (window.confirm('Are you sure you want to delete this transaction? This action cannot be undone.')) {
       deleteTransaction(transactionId);
     }
   };
+  
+  const handleDeleteAnnouncement = (announcementId: number) => {
+      if (window.confirm('Are you sure you want to delete this announcement?')) {
+          deleteAnnouncement(announcementId);
+      }
+  };
+  
+  const handleClearDatabase = () => {
+      if (window.confirm('DANGER: This will delete ALL transaction records and reset the class balance to $0. This action is irreversible. Are you absolutely sure?')) {
+          clearTransactions();
+          alert('All transactions have been cleared.');
+      }
+  }
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => 
@@ -154,22 +231,60 @@ const Admin: React.FC = () => {
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-8">
-          <AdminCard title="Update Class Logo">
-            <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'logo')} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-primary hover:file:bg-brand-accent/30"/>
-            {uploadStatus.logo && <p className="text-sm text-success mt-2">{uploadStatus.logo}</p>}
-          </AdminCard>
-
-          <AdminCard title="Update App Subtitle">
-            <input type="text" value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="e.g., A.E. Beach High C/o 89 Bulldogs" className="w-full border-gray-300 rounded-md shadow-sm"/>
-            <p className="text-xs text-gray-500 mt-2">This subtitle appears on the login screen and header.</p>
+          <AdminCard title="App Customization">
+            <div className="space-y-4">
+               <div>
+                  <label className="text-sm font-medium">Update Class Logo</label>
+                  <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'logo')} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-primary hover:file:bg-brand-accent/30"/>
+                  {uploadStatus.logo && <p className="text-sm text-success mt-2">{uploadStatus.logo}</p>}
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Update App Subtitle</label>
+                  <input type="text" value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="e.g., A.E. Beach High C/o 89 Bulldogs" className="mt-1 w-full border-gray-300 rounded-md shadow-sm"/>
+                  <p className="text-xs text-gray-500 mt-1">Appears on the login screen and header.</p>
+                </div>
+            </div>
           </AdminCard>
           
-          <AdminCard title="Post an Announcement">
-            <form onSubmit={handleAnnouncementSubmit} className="space-y-4">
-                <input type="text" name="title" placeholder="Announcement Title" value={announcement.title} onChange={handleAnnouncementChange} required className="w-full border-gray-300 rounded-md shadow-sm"/>
-                <textarea name="content" placeholder="Announcement Content" value={announcement.content} onChange={handleAnnouncementChange} required className="w-full border-gray-300 rounded-md shadow-sm" rows={4}></textarea>
-                <button type="submit" className="w-full bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary">Post Announcement</button>
-            </form>
+          <AdminCard title="Manage Announcements">
+              {/* New Text Announcement */}
+              <form onSubmit={handleAnnouncementSubmit} className="space-y-4 p-4 border rounded-md">
+                  <h4 className="font-semibold">Post a New Announcement</h4>
+                  <input type="text" name="title" placeholder="Announcement Title" value={announcement.title} onChange={handleAnnouncementChange} required className="w-full border-gray-300 rounded-md shadow-sm"/>
+                  <textarea name="content" placeholder="Announcement Content" value={announcement.content} onChange={handleAnnouncementChange} required className="w-full border-gray-300 rounded-md shadow-sm" rows={3}></textarea>
+                  <div>
+                    <label className="text-sm font-medium">Attach an Image (Optional)</label>
+                    <input type="file" accept="image/*" ref={announcementImageInputRef} onChange={handleAnnouncementImageChange} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100"/>
+                  </div>
+                  {announcementImagePreview && <img src={announcementImagePreview} alt="Preview" className="mt-2 h-24 w-auto rounded-md object-cover"/>}
+                  <button type="submit" className="w-full bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary">Post Text Announcement</button>
+              </form>
+              
+              {/* Embed FB Post */}
+               <form onSubmit={handleFbPostSubmit} className="space-y-4 p-4 border rounded-md mt-4">
+                  <h4 className="font-semibold">Embed a Facebook Post</h4>
+                  <input type="text" name="title" placeholder="Post Title (e.g., Reunion Details)" value={fbPost.title} onChange={handleFbPostChange} required className="w-full border-gray-300 rounded-md shadow-sm"/>
+                  <input type="url" name="url" placeholder="Facebook Post URL" value={fbPost.url} onChange={handleFbPostChange} required className="w-full border-gray-300 rounded-md shadow-sm"/>
+                  <button type="submit" className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">Embed Facebook Post</button>
+              </form>
+
+              {/* Existing Announcements */}
+              <div className="mt-6 space-y-2">
+                <h4 className="font-semibold border-t pt-4">Existing Announcements</h4>
+                {announcements.map(ann => (
+                  <div key={ann.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-md">
+                    <span className="text-sm truncate pr-2">{ann.title}</span>
+                    <button onClick={() => handleDeleteAnnouncement(ann.id)} className="text-danger hover:text-red-700 font-medium text-sm flex-shrink-0">Delete</button>
+                  </div>
+                ))}
+              </div>
+          </AdminCard>
+          
+           <AdminCard title="Danger Zone" borderColor="border-danger">
+              <p className="text-sm text-gray-600 mb-4">These actions are permanent and cannot be undone. Proceed with caution.</p>
+              <button onClick={handleClearDatabase} className="w-full bg-danger text-white py-2 px-4 rounded-md hover:bg-red-700 font-bold">
+                Zero Out Database (Clear All Transactions)
+              </button>
           </AdminCard>
         </div>
         
@@ -229,7 +344,7 @@ const Admin: React.FC = () => {
                     <td className="px-4 py-2 whitespace-nowrap">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(tx.amount)}</td>
                     <td className="px-4 py-2 whitespace-nowrap space-x-2">
                       <button onClick={() => setEditingTransaction(tx)} className="text-brand-secondary hover:text-brand-primary font-medium">Edit</button>
-                      <button onClick={() => handleDelete(tx.id)} className="text-danger hover:text-red-700 font-medium">Delete</button>
+                      <button onClick={() => handleDeleteTx(tx.id)} className="text-danger hover:text-red-700 font-medium">Delete</button>
                     </td>
                   </tr>
                 ))}

@@ -23,12 +23,14 @@ const App: React.FC = () => {
       title: 'Upcoming Class Reunion!',
       content: 'Join us for our 20-year reunion on October 15th! Early bird tickets are now available. A down payment of $50 is required by August 31st to secure your spot. We can\'t wait to see you there!',
       date: '2024-07-15',
+      type: 'text'
     },
     {
       id: 2,
       title: 'Class Fundraiser for John Doe',
       content: 'We are raising funds to support our classmate John Doe during a difficult time. Any donation, big or small, is greatly appreciated.',
       date: '2024-06-20',
+      type: 'text'
     },
   ]);
 
@@ -47,7 +49,7 @@ const App: React.FC = () => {
   };
 
   const addTransaction = useCallback((transaction: Omit<Transaction, 'id'>) => {
-    setTransactions(prev => [{ ...transaction, id: prev.length > 0 ? Math.max(...prev.map(t => t.id)) + 1 : 1 }, ...prev]);
+    setTransactions(prev => [{ ...transaction, id: Date.now() }, ...prev]);
   }, []);
   
   const updateTransaction = useCallback((updatedTransaction: Transaction) => {
@@ -57,10 +59,19 @@ const App: React.FC = () => {
   const deleteTransaction = useCallback((transactionId: number) => {
     setTransactions(prev => prev.filter(t => t.id !== transactionId));
   }, []);
+  
+  const clearTransactions = useCallback(() => {
+    setTransactions([]);
+  }, []);
 
   const addAnnouncement = useCallback((announcement: Omit<Announcement, 'id'>) => {
-    setAnnouncements(prev => [{ ...announcement, id: prev.length + 1 }, ...prev]);
+    setAnnouncements(prev => [{ ...announcement, id: Date.now() }, ...prev]);
   }, []);
+
+  const deleteAnnouncement = useCallback((announcementId: number) => {
+    setAnnouncements(prev => prev.filter(a => a.id !== announcementId));
+  }, []);
+
 
   const dataProviderValue = useMemo(() => ({
     user,
@@ -72,10 +83,12 @@ const App: React.FC = () => {
     addTransaction,
     updateTransaction,
     deleteTransaction,
+    clearTransactions,
     announcements,
     addAnnouncement,
+    deleteAnnouncement,
     classBalance: transactions.reduce((acc, t) => acc + t.amount, 0),
-  }), [user, logo, subtitle, transactions, announcements, addTransaction, updateTransaction, deleteTransaction, addAnnouncement]);
+  }), [user, logo, subtitle, transactions, announcements, addTransaction, updateTransaction, deleteTransaction, clearTransactions, addAnnouncement, deleteAnnouncement]);
 
   const renderPage = () => {
     switch (currentPage) {

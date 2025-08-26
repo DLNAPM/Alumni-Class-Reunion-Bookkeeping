@@ -23,6 +23,9 @@ export interface Announcement {
   title: string;
   content: string;
   date: string;
+  type?: 'text' | 'facebook';
+  url?: string;
+  imageUrl?: string;
 }
 
 export interface User {
@@ -42,7 +45,9 @@ export interface DataContextType {
   addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
   updateTransaction: (updatedTransaction: Transaction) => void;
   deleteTransaction: (transactionId: number) => void;
+  clearTransactions: () => void;
   announcements: Announcement[];
   addAnnouncement: (announcement: Omit<Announcement, 'id'>) => void;
+  deleteAnnouncement: (announcementId: number) => void;
   classBalance: number;
 }

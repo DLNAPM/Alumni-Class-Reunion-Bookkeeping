@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useData } from '../context/DataContext';
 import { PaymentCategory } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -15,7 +15,8 @@ const StatCard: React.FC<{ title: string; value: string; icon: React.ReactElemen
 );
 
 const Dashboard: React.FC = () => {
-  const { classBalance, transactions, announcements } = useData();
+  const { user, classBalance, transactions, announcements, deleteAnnouncement } = useData();
+  const [enlargedImageUrl, setEnlargedImageUrl] = useState<string | null>(null);
 
   const chartData = useMemo(() => {
     const yearlyData: { [year: string]: { contributions: number; payments: number } } = {};
@@ -86,15 +87,76 @@ const Dashboard: React.FC = () => {
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h3 className="text-xl font-semibold mb-4">Announcements</h3>
         <div className="space-y-4">
-          {announcements.slice(0, 3).map((ann) => (
-            <div key={ann.id} className="border-l-4 border-brand-accent p-4 bg-gray-50 rounded-r-lg">
-              <h4 className="font-bold">{ann.title}</h4>
-              <p className="text-sm text-gray-600 mt-1">{ann.content}</p>
-              <p className="text-xs text-gray-400 mt-2">{new Date(ann.date).toLocaleDateString()}</p>
-            </div>
-          ))}
+          {announcements.slice(0, 5).map((ann) => {
+            const handleDelete = () => {
+              if (window.confirm('Are you sure you want to delete this announcement?')) {
+                deleteAnnouncement(ann.id);
+              }
+            }
+
+            if (ann.type === 'facebook' && ann.url) {
+              return (
+                <div key={ann.id} className="border-l-4 border-blue-600 p-4 bg-gray-50 rounded-r-lg relative group">
+                  {user?.isAdmin && (
+                    <button onClick={handleDelete} className="absolute top-2 right-2 bg-white p-1 rounded-full text-danger hover:bg-gray-200 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                    </button>
+                  )}
+                  <h4 className="font-bold">{ann.title}</h4>
+                  <div className="mt-2 w-full max-w-lg mx-auto overflow-hidden">
+                    <iframe
+                      src={`https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(ann.url)}&show_text=true&width=500`}
+                      width="500"
+                      height="600"
+                      style={{ border: 'none', overflow: 'hidden' }}
+                      scrolling="no"
+                      frameBorder="0"
+                      allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                      allowFullScreen={true}
+                    ></iframe>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">{new Date(ann.date).toLocaleDateString()}</p>
+                </div>
+              );
+            }
+
+            return (
+              <div key={ann.id} className="border-l-4 border-brand-accent p-4 bg-gray-50 rounded-r-lg relative group">
+                {user?.isAdmin && (
+                  <button onClick={handleDelete} className="absolute top-2 right-2 bg-white p-1 rounded-full text-danger hover:bg-gray-200 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                  </button>
+                )}
+                <h4 className="font-bold">{ann.title}</h4>
+                <p className="text-sm text-gray-600 mt-1">{ann.content}</p>
+                {ann.imageUrl && (
+                  <img 
+                    src={ann.imageUrl} 
+                    alt={ann.title} 
+                    className="mt-3 rounded-lg max-h-60 w-auto cursor-pointer transition-transform duration-200 hover:scale-105"
+                    onClick={() => setEnlargedImageUrl(ann.imageUrl)}
+                  />
+                )}
+                <p className="text-xs text-gray-400 mt-2">{new Date(ann.date).toLocaleDateString()}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
+      {enlargedImageUrl && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50 p-4 transition-opacity duration-300"
+          onClick={() => setEnlargedImageUrl(null)}
+        >
+          <img 
+            src={enlargedImageUrl} 
+            alt="Enlarged view" 
+            className="max-w-full max-h-full rounded-lg shadow-2xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button className="absolute top-4 right-4 text-white text-4xl font-bold leading-none hover:text-gray-300">&times;</button>
+        </div>
+      )}
     </div>
   );
 };
