@@ -7,7 +7,7 @@ import Transactions from './components/Transactions';
 import Admin from './components/Admin';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
-import type { User, Transaction, Announcement, PaymentCategory } from './types';
+import type { User, Transaction, Announcement, IntegrationSettings, IntegrationService } from './types';
 import { generateMockTransactions } from './services/mockData';
 
 const App: React.FC = () => {
@@ -33,6 +33,13 @@ const App: React.FC = () => {
       type: 'text'
     },
   ]);
+  
+  const [integrationSettings, setIntegrationSettings] = useState<IntegrationSettings>({
+    cashApp: { connected: false, identifier: '' },
+    payPal: { connected: false, identifier: '' },
+    zelle: { connected: false, identifier: '' },
+    bank: { connected: false, identifier: '' },
+  });
 
   const handleLogin = (isAdmin: boolean) => {
     setUser({
@@ -47,6 +54,10 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setUser(null);
   };
+  
+  const updateIntegrationSettings = useCallback((service: keyof IntegrationSettings, settings: IntegrationService) => {
+    setIntegrationSettings(prev => ({ ...prev, [service]: settings }));
+  }, []);
 
   const addTransaction = useCallback((transaction: Omit<Transaction, 'id'>) => {
     setTransactions(prev => [{ ...transaction, id: Date.now() }, ...prev]);
@@ -88,7 +99,9 @@ const App: React.FC = () => {
     addAnnouncement,
     deleteAnnouncement,
     classBalance: transactions.reduce((acc, t) => acc + t.amount, 0),
-  }), [user, logo, subtitle, transactions, announcements, addTransaction, updateTransaction, deleteTransaction, clearTransactions, addAnnouncement, deleteAnnouncement]);
+    integrationSettings,
+    updateIntegrationSettings,
+  }), [user, logo, subtitle, transactions, announcements, addTransaction, updateTransaction, deleteTransaction, clearTransactions, addAnnouncement, deleteAnnouncement, integrationSettings, updateIntegrationSettings]);
 
   const renderPage = () => {
     switch (currentPage) {

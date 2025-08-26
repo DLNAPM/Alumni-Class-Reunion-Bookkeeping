@@ -35,6 +35,18 @@ export interface User {
   isAdmin: boolean;
 }
 
+export interface IntegrationService {
+  connected: boolean;
+  identifier: string;
+}
+
+export interface IntegrationSettings {
+  cashApp: IntegrationService;
+  payPal: IntegrationService;
+  zelle: IntegrationService;
+  bank: IntegrationService;
+}
+
 export interface DataContextType {
   user: User | null;
   logo: string;
@@ -50,4 +62,6 @@ export interface DataContextType {
   addAnnouncement: (announcement: Omit<Announcement, 'id'>) => void;
   deleteAnnouncement: (announcementId: number) => void;
   classBalance: number;
+  integrationSettings: IntegrationSettings;
+  updateIntegrationSettings: (service: keyof IntegrationSettings, settings: IntegrationService) => void;
 }

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useData } from '../context/DataContext';
-import { PaymentCategory, Transaction, Announcement } from '../types';
+import { PaymentCategory, Transaction, Announcement, IntegrationSettings } from '../types';
 
 // Generic card component for the admin panel sections
 const AdminCard: React.FC<{ title: string; children: React.ReactNode; borderColor?: string }> = ({ title, children, borderColor = 'border-b' }) => (
@@ -9,6 +9,63 @@ const AdminCard: React.FC<{ title: string; children: React.ReactNode; borderColo
     {children}
   </div>
 );
+
+// Integration Settings Component
+const IntegrationManager: React.FC<{
+  service: keyof IntegrationSettings;
+  title: string;
+  label: string;
+  placeholder: string;
+}> = ({ service, title, label, placeholder }) => {
+  const { integrationSettings, updateIntegrationSettings } = useData();
+  const [identifier, setIdentifier] = useState(integrationSettings[service].identifier);
+
+  const handleConnect = () => {
+    if (identifier) {
+      updateIntegrationSettings(service, { connected: true, identifier });
+      alert(`Successfully connected to ${title}!`);
+    } else {
+      alert(`Please enter a valid ${label}.`);
+    }
+  };
+
+  const handleDisconnect = () => {
+    updateIntegrationSettings(service, { connected: false, identifier: '' });
+    setIdentifier('');
+  };
+
+  const isConnected = integrationSettings[service].connected;
+
+  return (
+    <div>
+      <h4 className="font-semibold text-gray-800">{title}</h4>
+      {isConnected ? (
+        <div className="mt-2 flex items-center justify-between bg-green-50 p-3 rounded-md">
+          <div>
+            <p className="text-sm font-medium text-green-800">Connected</p>
+            <p className="text-sm text-gray-600 truncate">{integrationSettings[service].identifier}</p>
+          </div>
+          <button onClick={handleDisconnect} className="text-sm font-medium text-red-600 hover:text-red-800">Disconnect</button>
+        </div>
+      ) : (
+        <div className="mt-2 space-y-2">
+          <label className="block text-sm font-medium text-gray-700">{label}</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder={placeholder}
+              className="flex-grow w-full border-gray-300 rounded-md shadow-sm text-sm"
+            />
+            <button onClick={handleConnect} className="py-2 px-4 bg-brand-secondary text-white rounded-md hover:bg-brand-primary text-sm whitespace-nowrap">Connect</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 // Modal for editing transactions
 const EditTransactionModal: React.FC<{
@@ -63,7 +120,7 @@ const EditTransactionModal: React.FC<{
 
 
 const Admin: React.FC = () => {
-  const { transactions, addTransaction, updateTransaction, deleteTransaction, clearTransactions, announcements, addAnnouncement, deleteAnnouncement, setLogo, subtitle, setSubtitle } = useData();
+  const { transactions, addTransaction, updateTransaction, deleteTransaction, clearTransactions, announcements, addAnnouncement, deleteAnnouncement, setLogo, subtitle, setSubtitle, integrationSettings } = useData();
   
   const [manualTx, setManualTx] = useState({ classmateName: '', amount: '', category: PaymentCategory.Dues, description: '' });
   const [announcement, setAnnouncement] = useState({ title: '', content: '' });
@@ -246,6 +303,15 @@ const Admin: React.FC = () => {
             </div>
           </AdminCard>
           
+          <AdminCard title="Payment Integration Settings">
+            <div className="space-y-6">
+              <IntegrationManager service="cashApp" title="CashApp" label="$Cashtag" placeholder="$your-cashtag" />
+              <IntegrationManager service="payPal" title="PayPal" label="PayPal.Me Username or Email" placeholder="your-paypal" />
+              <IntegrationManager service="zelle" title="Zelle" label="Email or Phone Number" placeholder="your-email@example.com" />
+              <IntegrationManager service="bank" title="Bank Checking Account" label="Account Number (Last 4 Digits)" placeholder="1234" />
+            </div>
+          </AdminCard>
+          
           <AdminCard title="Manage Announcements">
               {/* New Text Announcement */}
               <form onSubmit={handleAnnouncementSubmit} className="space-y-4 p-4 border rounded-md">
@@ -297,10 +363,10 @@ const Admin: React.FC = () => {
                     {uploadStatus.excel && <p className="text-sm text-success mt-2">{uploadStatus.excel}</p>}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => handleImport('CashApp')} className="bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600 text-sm">Import from CashApp</button>
-                    <button onClick={() => handleImport('PayPal')} className="bg-blue-800 text-white py-2 px-4 rounded-md hover:bg-blue-900 text-sm">Import from PayPal</button>
-                    <button onClick={() => handleImport('Zelle')} className="bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 text-sm">Import from Zelle</button>
-                    <button onClick={() => handleImport('Bank')} className="bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600 text-sm">Import from Bank</button>
+                    <button onClick={() => handleImport('CashApp')} disabled={!integrationSettings.cashApp.connected} className="bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600 text-sm disabled:bg-gray-400 disabled:cursor-not-allowed">Import from CashApp</button>
+                    <button onClick={() => handleImport('PayPal')} disabled={!integrationSettings.payPal.connected} className="bg-blue-800 text-white py-2 px-4 rounded-md hover:bg-blue-900 text-sm disabled:bg-gray-400 disabled:cursor-not-allowed">Import from PayPal</button>
+                    <button onClick={() => handleImport('Zelle')} disabled={!integrationSettings.zelle.connected} className="bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 text-sm disabled:bg-gray-400 disabled:cursor-not-allowed">Import from Zelle</button>
+                    <button onClick={() => handleImport('Bank')} disabled={!integrationSettings.bank.connected} className="bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600 text-sm disabled:bg-gray-400 disabled:cursor-not-allowed">Import from Bank</button>
                 </div>
                  {Object.keys(uploadStatus).filter(k => k !== 'logo' && k !== 'excel').map(key => 
                     uploadStatus[key] && <p key={key} className="text-sm text-success mt-2">{uploadStatus[key]}</p>
