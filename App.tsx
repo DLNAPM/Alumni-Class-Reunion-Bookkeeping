@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useCallback } from 'react';
 import { DataProvider } from './context/DataContext';
 import Login from './components/Login';
@@ -48,7 +47,15 @@ const App: React.FC = () => {
   };
 
   const addTransaction = useCallback((transaction: Omit<Transaction, 'id'>) => {
-    setTransactions(prev => [{ ...transaction, id: prev.length + 1 }, ...prev]);
+    setTransactions(prev => [{ ...transaction, id: prev.length > 0 ? Math.max(...prev.map(t => t.id)) + 1 : 1 }, ...prev]);
+  }, []);
+  
+  const updateTransaction = useCallback((updatedTransaction: Transaction) => {
+    setTransactions(prev => prev.map(t => t.id === updatedTransaction.id ? updatedTransaction : t));
+  }, []);
+
+  const deleteTransaction = useCallback((transactionId: number) => {
+    setTransactions(prev => prev.filter(t => t.id !== transactionId));
   }, []);
 
   const addAnnouncement = useCallback((announcement: Omit<Announcement, 'id'>) => {
@@ -63,10 +70,12 @@ const App: React.FC = () => {
     setSubtitle,
     transactions,
     addTransaction,
+    updateTransaction,
+    deleteTransaction,
     announcements,
     addAnnouncement,
     classBalance: transactions.reduce((acc, t) => acc + t.amount, 0),
-  }), [user, logo, subtitle, transactions, announcements, addTransaction, addAnnouncement]);
+  }), [user, logo, subtitle, transactions, announcements, addTransaction, updateTransaction, deleteTransaction, addAnnouncement]);
 
   const renderPage = () => {
     switch (currentPage) {

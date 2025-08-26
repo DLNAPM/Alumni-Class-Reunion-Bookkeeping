@@ -18,15 +18,16 @@ const Dashboard: React.FC = () => {
   const { classBalance, transactions, announcements } = useData();
 
   const chartData = useMemo(() => {
-    const yearlyData: { [year: string]: { donations: number; payments: number } } = {};
+    const yearlyData: { [year: string]: { contributions: number; payments: number } } = {};
+    const contributionCategories = [PaymentCategory.Fundraiser, PaymentCategory.ClassmateSupport, PaymentCategory.Benevolence];
 
     transactions.forEach(t => {
       const year = new Date(t.date).getFullYear().toString();
       if (!yearlyData[year]) {
-        yearlyData[year] = { donations: 0, payments: 0 };
+        yearlyData[year] = { contributions: 0, payments: 0 };
       }
-      if (t.category === PaymentCategory.Donation) {
-        yearlyData[year].donations += t.amount;
+      if (contributionCategories.includes(t.category)) {
+        yearlyData[year].contributions += t.amount;
       } else {
         yearlyData[year].payments += t.amount;
       }
@@ -38,9 +39,10 @@ const Dashboard: React.FC = () => {
       .slice(-5); // Show last 5 years
   }, [transactions]);
 
-  const totalDonations = useMemo(() => {
+  const totalContributions = useMemo(() => {
+      const contributionCategories = [PaymentCategory.Fundraiser, PaymentCategory.ClassmateSupport, PaymentCategory.Benevolence];
       return transactions
-          .filter(t => t.category === PaymentCategory.Donation)
+          .filter(t => contributionCategories.includes(t.category))
           .reduce((sum, t) => sum + t.amount, 0);
   }, [transactions]);
 
@@ -53,8 +55,8 @@ const Dashboard: React.FC = () => {
           icon={<BalanceIcon />}
         />
         <StatCard 
-          title="Total Donations Received" 
-          value={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalDonations)}
+          title="Total Contributions Received" 
+          value={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalContributions)}
           icon={<DonationIcon />}
         />
          <StatCard 
@@ -74,7 +76,7 @@ const Dashboard: React.FC = () => {
               <YAxis tickFormatter={(value) => `$${value}`} />
               <Tooltip formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)} />
               <Legend />
-              <Bar dataKey="donations" fill="#4CAF50" name="Donations" />
+              <Bar dataKey="contributions" fill="#4CAF50" name="Contributions" />
               <Bar dataKey="payments" fill="#1976D2" name="Other Payments" />
             </BarChart>
           </ResponsiveContainer>

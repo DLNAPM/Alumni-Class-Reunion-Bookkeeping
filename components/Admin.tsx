@@ -1,5 +1,4 @@
-
-import React, { useState, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useData } from '../context/DataContext';
 import { PaymentCategory, Transaction, Announcement } from '../types';
 
@@ -11,17 +10,66 @@ const AdminCard: React.FC<{ title: string; children: React.ReactNode }> = ({ tit
   </div>
 );
 
+// Modal for editing transactions
+const EditTransactionModal: React.FC<{
+  transaction: Transaction;
+  onClose: () => void;
+  onSave: (transaction: Transaction) => void;
+}> = ({ transaction, onClose, onSave }) => {
+  const [formData, setFormData] = useState(transaction);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: name === 'amount' ? parseFloat(value) || 0 : value }));
+  };
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(formData);
+  };
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+      <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+        <h2 className="text-2xl font-bold mb-6">Edit Transaction</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Classmate Name</label>
+            <input type="text" name="classmateName" value={formData.classmateName} onChange={handleChange} required className="mt-1 w-full border-gray-300 rounded-md shadow-sm"/>
+          </div>
+           <div>
+            <label className="block text-sm font-medium text-gray-700">Amount</label>
+            <input type="number" name="amount" value={formData.amount} onChange={handleChange} required className="mt-1 w-full border-gray-300 rounded-md shadow-sm" min="0.01" step="0.01"/>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Category</label>
+            <select name="category" value={formData.category} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md shadow-sm">
+              {Object.values(PaymentCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Description (Optional)</label>
+            <input type="text" name="description" value={formData.description} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md shadow-sm"/>
+          </div>
+          <div className="flex justify-end space-x-4 pt-4">
+            <button type="button" onClick={onClose} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
+            <button type="submit" className="py-2 px-4 bg-brand-primary text-white rounded-md hover:bg-brand-secondary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+
 const Admin: React.FC = () => {
-  const { addTransaction, addAnnouncement, setLogo, subtitle, setSubtitle } = useData();
-
-  // State for manual transaction form
+  const { transactions, addTransaction, updateTransaction, deleteTransaction, addAnnouncement, setLogo, subtitle, setSubtitle } = useData();
+  
   const [manualTx, setManualTx] = useState({ classmateName: '', amount: '', category: PaymentCategory.Dues, description: '' });
-
-  // State for new announcement form
   const [announcement, setAnnouncement] = useState({ title: '', content: '' });
-
-  // State for file uploads and imports
   const [uploadStatus, setUploadStatus] = useState<Record<string, string>>({});
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const handleManualTxChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -36,14 +84,13 @@ const Admin: React.FC = () => {
   const handleManualTxSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (manualTx.classmateName && manualTx.amount) {
-      const newTransaction: Omit<Transaction, 'id'> = {
+      addTransaction({
           date: new Date().toISOString().split('T')[0],
           description: manualTx.description || `${manualTx.category} (Manual)`,
           category: manualTx.category,
           amount: parseFloat(manualTx.amount),
           classmateName: manualTx.classmateName,
-      };
-      addTransaction(newTransaction);
+      });
       alert('Transaction added successfully!');
       setManualTx({ classmateName: '', amount: '', category: PaymentCategory.Dues, description: '' });
     }
@@ -52,12 +99,11 @@ const Admin: React.FC = () => {
   const handleAnnouncementSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if(announcement.title && announcement.content) {
-          const newAnnouncement: Omit<Announcement, 'id'> = {
+          addAnnouncement({
               title: announcement.title,
               content: announcement.content,
               date: new Date().toISOString().split('T')[0],
-          };
-          addAnnouncement(newAnnouncement);
+          });
           alert('Announcement posted successfully!');
           setAnnouncement({ title: '', content: '' });
       }
@@ -88,12 +134,25 @@ const Admin: React.FC = () => {
         setUploadStatus(prev => ({...prev, [source]: `Successfully imported transactions from ${source}!`}));
       }, 2500);
   };
+  
+  const handleDelete = (transactionId: number) => {
+    if (window.confirm('Are you sure you want to delete this transaction? This action cannot be undone.')) {
+      deleteTransaction(transactionId);
+    }
+  };
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(t => 
+      t.classmateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.description.toLowerCase().includes(searchTerm.toLowerCase())
+    ).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [transactions, searchTerm]);
 
   return (
     <div className="space-y-8">
       <h2 className="text-3xl font-bold text-brand-text">Administrator Panel</h2>
+      
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
         <div className="space-y-8">
           <AdminCard title="Update Class Logo">
             <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'logo')} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-primary hover:file:bg-brand-accent/30"/>
@@ -101,13 +160,7 @@ const Admin: React.FC = () => {
           </AdminCard>
 
           <AdminCard title="Update App Subtitle">
-            <input
-              type="text"
-              value={subtitle}
-              onChange={(e) => setSubtitle(e.target.value)}
-              placeholder="e.g., A.E. Beach High C/o 89 Bulldogs"
-              className="w-full border-gray-300 rounded-md shadow-sm"
-            />
+            <input type="text" value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="e.g., A.E. Beach High C/o 89 Bulldogs" className="w-full border-gray-300 rounded-md shadow-sm"/>
             <p className="text-xs text-gray-500 mt-2">This subtitle appears on the login screen and header.</p>
           </AdminCard>
           
@@ -118,7 +171,9 @@ const Admin: React.FC = () => {
                 <button type="submit" className="w-full bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary">Post Announcement</button>
             </form>
           </AdminCard>
-          
+        </div>
+        
+        <div className="space-y-8">
           <AdminCard title="Import Transactions">
             <div className="space-y-4">
                 <div>
@@ -137,21 +192,66 @@ const Admin: React.FC = () => {
                 )}
             </div>
           </AdminCard>
+          <AdminCard title="Manually Enter Transaction">
+            <form onSubmit={handleManualTxSubmit} className="space-y-4">
+              <input type="text" name="classmateName" placeholder="Classmate Name" value={manualTx.classmateName} onChange={handleManualTxChange} required className="w-full border-gray-300 rounded-md shadow-sm"/>
+              <input type="number" name="amount" placeholder="Amount" value={manualTx.amount} onChange={handleManualTxChange} required className="w-full border-gray-300 rounded-md shadow-sm" min="0.01" step="0.01"/>
+              <select name="category" value={manualTx.category} onChange={handleManualTxChange} className="w-full border-gray-300 rounded-md shadow-sm">
+                  {Object.values(PaymentCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+              </select>
+              <input type="text" name="description" placeholder="Description (Optional)" value={manualTx.description} onChange={handleManualTxChange} className="w-full border-gray-300 rounded-md shadow-sm"/>
+              <button type="submit" className="w-full bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary">Add Transaction</button>
+            </form>
+          </AdminCard>
         </div>
-
-        <AdminCard title="Manually Enter Transaction">
-          <form onSubmit={handleManualTxSubmit} className="space-y-4">
-            <input type="text" name="classmateName" placeholder="Classmate Name" value={manualTx.classmateName} onChange={handleManualTxChange} required className="w-full border-gray-300 rounded-md shadow-sm"/>
-            <input type="number" name="amount" placeholder="Amount" value={manualTx.amount} onChange={handleManualTxChange} required className="w-full border-gray-300 rounded-md shadow-sm" min="0.01" step="0.01"/>
-            <select name="category" value={manualTx.category} onChange={handleManualTxChange} className="w-full border-gray-300 rounded-md shadow-sm">
-                {Object.values(PaymentCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
-            </select>
-            <input type="text" name="description" placeholder="Description (Optional)" value={manualTx.description} onChange={handleManualTxChange} className="w-full border-gray-300 rounded-md shadow-sm"/>
-            <button type="submit" className="w-full bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary">Add Transaction</button>
-          </form>
-        </AdminCard>
-
       </div>
+
+      <div className="mt-8">
+        <AdminCard title="Manage All Transactions">
+          <input type="text" placeholder="Search by name or description..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm mb-4"/>
+          <div className="overflow-x-auto max-h-[500px]">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Classmate</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredTransactions.map(tx => (
+                  <tr key={tx.id}>
+                    <td className="px-4 py-2 whitespace-nowrap">{new Date(tx.date).toLocaleDateString()}</td>
+                    <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900">{tx.classmateName}</td>
+                    <td className="px-4 py-2 whitespace-nowrap">{tx.category}</td>
+                    <td className="px-4 py-2 whitespace-nowrap">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(tx.amount)}</td>
+                    <td className="px-4 py-2 whitespace-nowrap space-x-2">
+                      <button onClick={() => setEditingTransaction(tx)} className="text-brand-secondary hover:text-brand-primary font-medium">Edit</button>
+                      <button onClick={() => handleDelete(tx.id)} className="text-danger hover:text-red-700 font-medium">Delete</button>
+                    </td>
+                  </tr>
+                ))}
+                 {filteredTransactions.length === 0 && (
+                  <tr><td colSpan={5} className="text-center py-10 text-gray-500">No matching transactions found.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </AdminCard>
+      </div>
+
+      {editingTransaction && (
+        <EditTransactionModal 
+          transaction={editingTransaction}
+          onClose={() => setEditingTransaction(null)}
+          onSave={(updatedTx) => {
+            updateTransaction(updatedTx);
+            setEditingTransaction(null);
+          }}
+        />
+      )}
     </div>
   );
 };

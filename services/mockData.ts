@@ -1,4 +1,3 @@
-
 import { PaymentCategory, Transaction } from '../types';
 
 const classmates = [
@@ -15,7 +14,7 @@ export const generateMockTransactions = (): Transaction[] => {
   for (let i = 1; i <= 150; i++) {
     const randomDate = new Date(startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime()));
     const category = categories[Math.floor(Math.random() * categories.length)];
-    const amount = category === PaymentCategory.Donation 
+    const amount = category === PaymentCategory.Fundraiser 
       ? Math.floor(Math.random() * 200) + 20 
       : Math.floor(Math.random() * 100) + 25;
 

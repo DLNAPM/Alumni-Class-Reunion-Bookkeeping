@@ -1,13 +1,12 @@
-
 import React from 'react';
 
 export enum PaymentCategory {
   Dues = 'Dues',
-  Vacation = 'Class Vacation',
-  Funeral = 'Funeral Services',
-  Donation = 'Donations',
-  Support = 'Classmate Support',
-  Reunion = 'Reunion Fees',
+  ReunionDeposit = 'Reunion Deposit',
+  Fundraiser = 'Fundraiser',
+  ClassmateSupport = 'Classmate Support',
+  Benevolence = 'Benevolence',
+  SimpleDeposit = 'Simple-Deposit',
 }
 
 export interface Transaction {
@@ -41,6 +40,8 @@ export interface DataContextType {
   setSubtitle: React.Dispatch<React.SetStateAction<string>>;
   transactions: Transaction[];
   addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
+  updateTransaction: (updatedTransaction: Transaction) => void;
+  deleteTransaction: (transactionId: number) => void;
   announcements: Announcement[];
   addAnnouncement: (announcement: Omit<Announcement, 'id'>) => void;
   classBalance: number;
