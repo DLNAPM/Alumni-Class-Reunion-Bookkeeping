@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
-import { PaymentCategory, Transaction } from '../types';
+import { PaymentCategory, Transaction, PaymentType } from '../types';
 
 const MakePayment: React.FC = () => {
   const { user, addTransaction } = useData();
@@ -22,6 +21,7 @@ const MakePayment: React.FC = () => {
       category: category,
       amount: parseFloat(amount),
       classmateName: user.name,
+      paymentType: PaymentType.CreditCard,
     };
     
     // Simulate API call

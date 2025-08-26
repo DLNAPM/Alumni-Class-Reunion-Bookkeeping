@@ -9,11 +9,22 @@ export enum PaymentCategory {
   SimpleDeposit = 'Simple-Deposit',
 }
 
+export enum PaymentType {
+  CreditCard = 'Credit Card',
+  ManualEntry = 'Manual Entry',
+  ImportedCashApp = 'Imported - CashApp',
+  ImportedPayPal = 'Imported - PayPal',
+  ImportedZelle = 'Imported - Zelle',
+  ImportedBank = 'Imported - Bank',
+  ImportedExcel = 'Imported - Excel/CSV',
+}
+
 export interface Transaction {
   id: number;
   date: string;
   description: string;
   category: PaymentCategory;
+  paymentType: PaymentType;
   amount: number;
   classmateName: string;
 }

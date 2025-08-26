@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useData } from '../context/DataContext';
-import { PaymentCategory, Transaction, Announcement, IntegrationSettings } from '../types';
+import { PaymentCategory, Transaction, Announcement, IntegrationSettings, PaymentType } from '../types';
 
 // Generic card component for the admin panel sections
 const AdminCard: React.FC<{ title: string; children: React.ReactNode; borderColor?: string }> = ({ title, children, borderColor = 'border-b' }) => (
@@ -105,6 +105,12 @@ const EditTransactionModal: React.FC<{
             </select>
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700">Payment Type</label>
+            <select name="paymentType" value={formData.paymentType} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md shadow-sm">
+                {Object.values(PaymentType).map(pt => <option key={pt} value={pt}>{pt}</option>)}
+            </select>
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700">Description (Optional)</label>
             <input type="text" name="description" value={formData.description} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md shadow-sm"/>
           </div>
@@ -172,6 +178,7 @@ const Admin: React.FC = () => {
           category: manualTx.category,
           amount: parseFloat(manualTx.amount),
           classmateName: manualTx.classmateName,
+          paymentType: PaymentType.ManualEntry,
       });
       alert('Transaction added successfully!');
       setManualTx({ classmateName: '', amount: '', category: PaymentCategory.Dues, description: '' });
@@ -397,6 +404,7 @@ const Admin: React.FC = () => {
                   <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Date</th>
                   <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Classmate</th>
                   <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Payment Type</th>
                   <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                   <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -407,6 +415,7 @@ const Admin: React.FC = () => {
                     <td className="px-4 py-2 whitespace-nowrap">{new Date(tx.date).toLocaleDateString()}</td>
                     <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900">{tx.classmateName}</td>
                     <td className="px-4 py-2 whitespace-nowrap">{tx.category}</td>
+                    <td className="px-4 py-2 whitespace-nowrap text-xs">{tx.paymentType}</td>
                     <td className="px-4 py-2 whitespace-nowrap">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(tx.amount)}</td>
                     <td className="px-4 py-2 whitespace-nowrap space-x-2">
                       <button onClick={() => setEditingTransaction(tx)} className="text-brand-secondary hover:text-brand-primary font-medium">Edit</button>
@@ -415,7 +424,7 @@ const Admin: React.FC = () => {
                   </tr>
                 ))}
                  {filteredTransactions.length === 0 && (
-                  <tr><td colSpan={5} className="text-center py-10 text-gray-500">No matching transactions found.</td></tr>
+                  <tr><td colSpan={6} className="text-center py-10 text-gray-500">No matching transactions found.</td></tr>
                 )}
               </tbody>
             </table>

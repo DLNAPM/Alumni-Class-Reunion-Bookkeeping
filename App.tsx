@@ -5,6 +5,7 @@ import Dashboard from './components/Dashboard';
 import MakePayment from './components/MakePayment';
 import Transactions from './components/Transactions';
 import Admin from './components/Admin';
+import Reporting from './components/Reporting';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import type { User, Transaction, Announcement, IntegrationSettings, IntegrationService } from './types';
@@ -113,6 +114,8 @@ const App: React.FC = () => {
         return <Transactions />;
       case 'admin':
         return user?.isAdmin ? <Admin /> : <Dashboard />; // Fallback to dashboard if not admin
+      case 'reporting':
+        return user?.isAdmin ? <Reporting /> : <Dashboard />; // Fallback to dashboard if not admin
       default:
         return <Dashboard />;
     }
