@@ -97,7 +97,7 @@ const EditTransactionModal: React.FC<{
           </div>
            <div>
             <label className="block text-sm font-medium text-gray-700">Amount</label>
-            <input type="number" name="amount" value={formData.amount} onChange={handleChange} required className="mt-1 w-full border-gray-300 rounded-md shadow-sm" min="0.01" step="0.01"/>
+            <input type="number" name="amount" value={formData.amount} onChange={handleChange} required className="mt-1 w-full border-gray-300 rounded-md shadow-sm" step="0.01"/>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Category</label>
@@ -255,6 +255,37 @@ const ReconciliationModal: React.FC<{
   );
 };
 
+const parseDate = (dateStr: string): Date | null => {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+
+  // Try standard parsing first (handles YYYY-MM-DD, MM/DD/YYYY etc.)
+  let date = new Date(dateStr);
+  if (!isNaN(date.getTime())) {
+    return date;
+  }
+  
+  // Try custom format like "6-Jun-09"
+  const parts = dateStr.trim().match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
+  if (parts) {
+    const day = parseInt(parts[1], 10);
+    const monthStr = parts[2].charAt(0).toUpperCase() + parts[2].slice(1).toLowerCase();
+    const yearPart = parseInt(parts[3], 10);
+    const year = yearPart < 100 ? 2000 + yearPart : yearPart;
+
+    const monthIndex = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].indexOf(monthStr);
+
+    if (day > 0 && monthIndex >= 0 && year > 1900) {
+      // Use UTC to avoid timezone issues during parsing
+      date = new Date(Date.UTC(year, monthIndex, day));
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
+  }
+
+  console.warn(`Could not parse date: "${dateStr}"`);
+  return null;
+};
 
 
 const Admin: React.FC = () => {
@@ -395,7 +426,7 @@ const Admin: React.FC = () => {
         complete: (results) => {
           try {
             let importedCount = 0;
-            (results.data as any[]).forEach(row => {
+            (results.data as any[]).forEach((row, index) => {
               // Normalize headers (case-insensitive, ignore spaces)
               const normalizedRow: {[key: string]: any} = {};
               for (const key in row) {
@@ -404,24 +435,30 @@ const Admin: React.FC = () => {
 
               const amountStr = normalizedRow.amount || normalizedRow.debit || normalizedRow.credit || '0';
               const amount = parseFloat(amountStr.replace(/[^0-9.-]+/g,""));
+              
+              const name = normalizedRow.classmate || normalizedRow.classmatename || normalizedRow.name;
+              
+              const parsedDate = parseDate(normalizedRow.date);
 
-              const name = normalizedRow.classmatename || normalizedRow.name;
-
-              if (!normalizedRow.date || !name || isNaN(amount) || amount === 0) {
-                  console.warn('Skipping invalid row:', row);
+              if (!parsedDate || !name || isNaN(amount)) {
+                  console.warn(`Skipping invalid row #${index + 2}:`, {row, parsedDate, name, amount});
                   return; // Skip rows without essential data
               }
 
               const categoryString = normalizedRow.category || 'Simple-Deposit';
-              const category = Object.values(PaymentCategory).find(c => c.toLowerCase() === categoryString.toLowerCase()) || PaymentCategory.SimpleDeposit;
+              // Find case-insensitive match, then fallback to SimpleDeposit
+              const category = Object.values(PaymentCategory).find(c => c.toLowerCase() === categoryString.toLowerCase().trim()) || PaymentCategory.SimpleDeposit;
               
+              const paymentTypeString = normalizedRow.paymenttype || '';
+              const paymentType = Object.values(PaymentType).find(pt => pt.toLowerCase().replace(/[^a-z0-9]/g, '') === paymentTypeString.toLowerCase().replace(/[^a-z0-9]/g, '')) || PaymentType.ImportedExcel;
+
               const newTransaction: Omit<Transaction, 'id'> = {
-                date: new Date(normalizedRow.date).toISOString().split('T')[0],
-                classmateName: name,
+                date: parsedDate.toISOString().split('T')[0],
+                classmateName: name.trim(),
                 amount: amount,
                 category: category,
                 description: normalizedRow.description || `${category} - Imported`,
-                paymentType: PaymentType.ImportedExcel,
+                paymentType: paymentType,
                 transactionId: normalizedRow.transactionid || undefined,
               };
 
@@ -597,7 +634,7 @@ const Admin: React.FC = () => {
           <AdminCard title="Manually Enter Transaction">
             <form onSubmit={handleManualTxSubmit} className="space-y-4">
               <input type="text" name="classmateName" placeholder="Classmate Name" value={manualTx.classmateName} onChange={handleManualTxChange} required className="w-full border-gray-300 rounded-md shadow-sm"/>
-              <input type="number" name="amount" placeholder="Amount" value={manualTx.amount} onChange={handleManualTxChange} required className="w-full border-gray-300 rounded-md shadow-sm" min="0.01" step="0.01"/>
+              <input type="number" name="amount" placeholder="Amount" value={manualTx.amount} onChange={handleManualTxChange} required className="w-full border-gray-300 rounded-md shadow-sm" step="0.01"/>
               <select name="category" value={manualTx.category} onChange={handleManualTxChange} className="w-full border-gray-300 rounded-md shadow-sm">
                   {Object.values(PaymentCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
               </select>
