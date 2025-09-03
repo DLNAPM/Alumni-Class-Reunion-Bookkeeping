@@ -14,23 +14,47 @@ const StatCard: React.FC<{ title: string; value: string; icon: React.ReactElemen
   </div>
 );
 
+const categoryColors: { [key in PaymentCategory]: string } = {
+  [PaymentCategory.Dues]: '#1976D2',
+  [PaymentCategory.ReunionDeposit]: '#64B5F6',
+  [PaymentCategory.Fundraiser]: '#4CAF50',
+  [PaymentCategory.ClassmateSupport]: '#FFC107',
+  [PaymentCategory.Benevolence]: '#F44336',
+  [PaymentCategory.Bereavement]: '#9C27B0',
+  [PaymentCategory.SimpleDeposit]: '#795548',
+  [PaymentCategory.Picnic]: '#009688',
+  [PaymentCategory.Expense]: '#E91E63',
+  [PaymentCategory.BankMaintFee]: '#607D8B',
+};
+
 const Dashboard: React.FC = () => {
   const { user, classBalance, transactions, announcements, deleteAnnouncement } = useData();
   const [enlargedImageUrl, setEnlargedImageUrl] = useState<string | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<PaymentCategory[]>([PaymentCategory.Dues, PaymentCategory.Fundraiser]);
+
+  const handleCategoryChange = (category: PaymentCategory) => {
+    setSelectedCategories(prev =>
+      prev.includes(category)
+        ? prev.filter(c => c !== category)
+        : [...prev, category]
+    );
+  };
 
   const chartData = useMemo(() => {
-    const yearlyData: { [year: string]: { contributions: number; payments: number } } = {};
-    const contributionCategories = [PaymentCategory.Fundraiser, PaymentCategory.ClassmateSupport, PaymentCategory.Benevolence];
+    if (selectedCategories.length === 0) return [];
+
+    const yearlyData: { [year: string]: { [category: string]: number } } = {};
 
     transactions.forEach(t => {
-      const year = new Date(t.date).getFullYear().toString();
-      if (!yearlyData[year]) {
-        yearlyData[year] = { contributions: 0, payments: 0 };
-      }
-      if (contributionCategories.includes(t.category)) {
-        yearlyData[year].contributions += t.amount;
-      } else {
-        yearlyData[year].payments += t.amount;
+      if (selectedCategories.includes(t.category)) {
+        const year = new Date(t.date).getFullYear().toString();
+        if (!yearlyData[year]) {
+          yearlyData[year] = {};
+          selectedCategories.forEach(cat => {
+            yearlyData[year][cat] = 0;
+          });
+        }
+        yearlyData[year][t.category] = (yearlyData[year][t.category] || 0) + t.amount;
       }
     });
 
@@ -38,7 +62,7 @@ const Dashboard: React.FC = () => {
       .map(([year, data]) => ({ year, ...data }))
       .sort((a, b) => parseInt(a.year) - parseInt(b.year))
       .slice(-5); // Show last 5 years
-  }, [transactions]);
+  }, [transactions, selectedCategories]);
 
   const totalContributions = useMemo(() => {
       const contributionCategories = [PaymentCategory.Fundraiser, PaymentCategory.ClassmateSupport, PaymentCategory.Benevolence];
@@ -68,19 +92,45 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="bg-white p-6 rounded-lg shadow-md">
-        <h3 className="text-xl font-semibold mb-4">Yearly Contributions</h3>
+        <h3 className="text-xl font-semibold">Yearly Financials by Category</h3>
+        
+        <div className="border-y border-gray-200 my-4 py-4">
+          <h4 className="text-md font-semibold mb-3 text-gray-600">Select categories to compare:</h4>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-4 gap-y-2">
+            {Object.values(PaymentCategory).map(cat => (
+              <label key={cat} className="flex items-center space-x-2 cursor-pointer p-1 rounded-md hover:bg-gray-100 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={selectedCategories.includes(cat)}
+                  onChange={() => handleCategoryChange(cat)}
+                  className="h-4 w-4 text-brand-primary border-gray-300 rounded focus:ring-brand-primary"
+                  style={{ color: categoryColors[cat] }}
+                />
+                <span className="text-sm text-gray-700">{cat}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
         <div style={{ width: '100%', height: 300 }}>
-          <ResponsiveContainer>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="year" />
-              <YAxis tickFormatter={(value) => `$${value}`} />
-              <Tooltip formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)} />
-              <Legend />
-              <Bar dataKey="contributions" fill="#4CAF50" name="Contributions" />
-              <Bar dataKey="payments" fill="#1976D2" name="Other Payments" />
-            </BarChart>
-          </ResponsiveContainer>
+          {selectedCategories.length > 0 ? (
+            <ResponsiveContainer>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="year" />
+                <YAxis tickFormatter={(value) => `$${value}`} />
+                <Tooltip formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)} />
+                <Legend />
+                {selectedCategories.map(cat => (
+                  <Bar key={cat} dataKey={cat} fill={categoryColors[cat]} name={cat} stackId="a" />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+             <div className="flex items-center justify-center h-full text-gray-500">
+                <p>Please select one or more categories to display the chart.</p>
+            </div>
+          )}
         </div>
       </div>
 
