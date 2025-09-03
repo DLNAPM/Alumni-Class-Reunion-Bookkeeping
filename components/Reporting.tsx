@@ -14,6 +14,7 @@ const Reporting: React.FC = () => {
     maxAmount: '',
     description: '',
     paymentTypes: [] as PaymentType[],
+    transactionId: '',
   };
 
   const [filters, setFilters] = useState(initialFilters);
@@ -51,6 +52,7 @@ const Reporting: React.FC = () => {
       if (filters.paymentTypes.length > 0 && !filters.paymentTypes.includes(t.paymentType)) return false;
       if (filters.minAmount && t.amount < parseFloat(filters.minAmount)) return false;
       if (filters.maxAmount && t.amount > parseFloat(filters.maxAmount)) return false;
+      if (filters.transactionId && (!t.transactionId || !t.transactionId.toLowerCase().includes(filters.transactionId.toLowerCase()))) return false;
       
       return true;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -64,9 +66,9 @@ const Reporting: React.FC = () => {
   }, [filteredTransactions]);
 
   const exportToCsv = () => {
-    const headers = ['ID', 'Date', 'Classmate Name', 'Category', 'Payment Type', 'Description', 'Amount'];
+    const headers = ['ID', 'Date', 'Classmate Name', 'Category', 'Payment Type', 'Description', 'Transaction ID', 'Amount'];
     const rows = filteredTransactions.map(t => 
-      [t.id, t.date, `"${t.classmateName}"`, t.category, t.paymentType, `"${t.description.replace(/"/g, '""')}"`, t.amount].join(',')
+      [t.id, t.date, `"${t.classmateName}"`, t.category, t.paymentType, `"${t.description.replace(/"/g, '""')}"`, t.transactionId || '', t.amount].join(',')
     );
     const csvContent = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -92,6 +94,7 @@ const Reporting: React.FC = () => {
           <input type="date" name="endDate" value={filters.endDate} onChange={handleFilterChange} className="border-gray-300 rounded-md shadow-sm" title="End Date" />
           <input type="text" name="classmateName" placeholder="Classmate Name..." value={filters.classmateName} onChange={handleFilterChange} className="border-gray-300 rounded-md shadow-sm" />
           <input type="text" name="description" placeholder="Description contains..." value={filters.description} onChange={handleFilterChange} className="border-gray-300 rounded-md shadow-sm" />
+          <input type="text" name="transactionId" placeholder="Transaction ID..." value={filters.transactionId} onChange={handleFilterChange} className="border-gray-300 rounded-md shadow-sm" />
           <div className="flex gap-2">
             <input type="number" name="minAmount" placeholder="Min Amount" value={filters.minAmount} onChange={handleFilterChange} className="w-1/2 border-gray-300 rounded-md shadow-sm" min="0" />
             <input type="number" name="maxAmount" placeholder="Max Amount" value={filters.maxAmount} onChange={handleFilterChange} className="w-1/2 border-gray-300 rounded-md shadow-sm" min="0" />
@@ -130,6 +133,7 @@ const Reporting: React.FC = () => {
                         <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Category</th>
                         <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Payment Type</th>
                         <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                        <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Transaction ID</th>
                         <th className="px-4 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                     </tr>
                 </thead>
@@ -141,11 +145,12 @@ const Reporting: React.FC = () => {
                             <td className="px-4 py-2 whitespace-nowrap">{t.category}</td>
                             <td className="px-4 py-2 whitespace-nowrap text-xs">{t.paymentType}</td>
                             <td className="px-4 py-2 whitespace-nowrap text-gray-600 truncate max-w-xs">{t.description}</td>
+                            <td className="px-4 py-2 whitespace-nowrap text-gray-500 truncate max-w-xs" title={t.transactionId}>{t.transactionId || ''}</td>
                             <td className="px-4 py-2 whitespace-nowrap text-right font-semibold">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(t.amount)}</td>
                         </tr>
                     ))}
                     {filteredTransactions.length === 0 && (
-                        <tr><td colSpan={6} className="text-center py-10 text-gray-500">No transactions match the current filters.</td></tr>
+                        <tr><td colSpan={7} className="text-center py-10 text-gray-500">No transactions match the current filters.</td></tr>
                     )}
                 </tbody>
             </table>

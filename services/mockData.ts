@@ -20,7 +20,7 @@ export const generateMockTransactions = (): Transaction[] => {
       ? Math.floor(Math.random() * 200) + 20 
       : Math.floor(Math.random() * 100) + 25;
 
-    transactions.push({
+    const transaction: Transaction = {
       id: i,
       date: randomDate.toISOString().split('T')[0],
       description: `${category} Payment`,
@@ -28,7 +28,20 @@ export const generateMockTransactions = (): Transaction[] => {
       paymentType: paymentType,
       amount: amount,
       classmateName: classmates[Math.floor(Math.random() * classmates.length)],
-    });
+    };
+    
+    const importedTypes = [
+      PaymentType.ImportedCashApp,
+      PaymentType.ImportedPayPal,
+      PaymentType.ImportedZelle,
+      PaymentType.ImportedBank,
+    ];
+
+    if (importedTypes.includes(paymentType)) {
+      transaction.transactionId = Math.random().toString(36).substring(2, 15).toUpperCase();
+    }
+    
+    transactions.push(transaction);
   }
 
   return transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

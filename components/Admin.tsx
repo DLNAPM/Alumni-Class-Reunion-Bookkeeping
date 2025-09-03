@@ -114,6 +114,10 @@ const EditTransactionModal: React.FC<{
             <label className="block text-sm font-medium text-gray-700">Description (Optional)</label>
             <input type="text" name="description" value={formData.description} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md shadow-sm"/>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Transaction ID (Optional)</label>
+            <input type="text" name="transactionId" value={formData.transactionId || ''} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md shadow-sm"/>
+          </div>
           <div className="flex justify-end space-x-4 pt-4">
             <button type="button" onClick={onClose} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
             <button type="submit" className="py-2 px-4 bg-brand-primary text-white rounded-md hover:bg-brand-secondary">Save Changes</button>
@@ -128,7 +132,7 @@ const EditTransactionModal: React.FC<{
 const Admin: React.FC = () => {
   const { transactions, addTransaction, updateTransaction, deleteTransaction, clearTransactions, announcements, addAnnouncement, deleteAnnouncement, setLogo, subtitle, setSubtitle, integrationSettings } = useData();
   
-  const [manualTx, setManualTx] = useState({ classmateName: '', amount: '', category: PaymentCategory.Dues, description: '' });
+  const [manualTx, setManualTx] = useState({ classmateName: '', amount: '', category: PaymentCategory.Dues, description: '', transactionId: '' });
   const [announcement, setAnnouncement] = useState({ title: '', content: '' });
   const [announcementImage, setAnnouncementImage] = useState<File | null>(null);
   const [announcementImagePreview, setAnnouncementImagePreview] = useState<string | null>(null);
@@ -179,9 +183,10 @@ const Admin: React.FC = () => {
           amount: parseFloat(manualTx.amount),
           classmateName: manualTx.classmateName,
           paymentType: PaymentType.ManualEntry,
+          transactionId: manualTx.transactionId || undefined,
       });
       alert('Transaction added successfully!');
-      setManualTx({ classmateName: '', amount: '', category: PaymentCategory.Dues, description: '' });
+      setManualTx({ classmateName: '', amount: '', category: PaymentCategory.Dues, description: '', transactionId: '' });
     }
   };
   
@@ -388,6 +393,7 @@ const Admin: React.FC = () => {
                   {Object.values(PaymentCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
               </select>
               <input type="text" name="description" placeholder="Description (Optional)" value={manualTx.description} onChange={handleManualTxChange} className="w-full border-gray-300 rounded-md shadow-sm"/>
+              <input type="text" name="transactionId" placeholder="Transaction ID (Optional)" value={manualTx.transactionId} onChange={handleManualTxChange} className="w-full border-gray-300 rounded-md shadow-sm"/>
               <button type="submit" className="w-full bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary">Add Transaction</button>
             </form>
           </AdminCard>
@@ -405,6 +411,7 @@ const Admin: React.FC = () => {
                   <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Classmate</th>
                   <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Category</th>
                   <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Payment Type</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Transaction ID</th>
                   <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                   <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -416,6 +423,7 @@ const Admin: React.FC = () => {
                     <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900">{tx.classmateName}</td>
                     <td className="px-4 py-2 whitespace-nowrap">{tx.category}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-xs">{tx.paymentType}</td>
+                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-500 truncate" title={tx.transactionId}>{tx.transactionId || 'N/A'}</td>
                     <td className="px-4 py-2 whitespace-nowrap">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(tx.amount)}</td>
                     <td className="px-4 py-2 whitespace-nowrap space-x-2">
                       <button onClick={() => setEditingTransaction(tx)} className="text-brand-secondary hover:text-brand-primary font-medium">Edit</button>
@@ -424,7 +432,7 @@ const Admin: React.FC = () => {
                   </tr>
                 ))}
                  {filteredTransactions.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-10 text-gray-500">No matching transactions found.</td></tr>
+                  <tr><td colSpan={7} className="text-center py-10 text-gray-500">No matching transactions found.</td></tr>
                 )}
               </tbody>
             </table>

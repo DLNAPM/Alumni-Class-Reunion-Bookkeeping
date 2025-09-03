@@ -27,6 +27,7 @@ export interface Transaction {
   paymentType: PaymentType;
   amount: number;
   classmateName: string;
+  transactionId?: string;
 }
 
 export interface Announcement {
