@@ -234,23 +234,22 @@ const Admin: React.FC = () => {
                 if (!date && !(nameKey && row[nameKey])) {
                   continue; // Skip rows without a date or a name
                 }
+                
+                const categoryStr = catKey && row[catKey] ? String(row[catKey]).trim().toLowerCase() : '';
+                const matchedCategory = Object.values(PaymentCategory).find(cat => cat.toLowerCase() === categoryStr);
+
+                const paymentTypeStr = paymentTypeKey && row[paymentTypeKey] ? String(row[paymentTypeKey]).trim().toLowerCase() : '';
+                const matchedPaymentType = Object.values(PaymentType).find(pt => pt.toLowerCase() === paymentTypeStr);
 
                 const newTx: Omit<Transaction, 'id'> = {
                     date: date || new Date().toISOString().split('T')[0],
                     classmateName: nameKey ? String(row[nameKey] || 'N/A') : 'N/A',
                     amount: amount,
                     description: descKey ? String(row[descKey] || '') : '',
-                    category: (catKey && row[catKey] ? row[catKey] : PaymentCategory.SimpleDeposit) as PaymentCategory,
-                    paymentType: (paymentTypeKey && row[paymentTypeKey] ? row[paymentTypeKey] : PaymentType.Other) as PaymentType,
+                    category: matchedCategory || PaymentCategory.SimpleDeposit,
+                    paymentType: matchedPaymentType || PaymentType.Other,
                     transactionId: transactionIdKey ? String(row[transactionIdKey] || '') : undefined,
                 };
-
-                if (!Object.values(PaymentCategory).includes(newTx.category)) {
-                    newTx.category = PaymentCategory.SimpleDeposit;
-                }
-                const paymentTypeStr = String(newTx.paymentType).toLowerCase();
-                const matchedPaymentType = Object.values(PaymentType).find(pt => String(pt).toLowerCase() === paymentTypeStr);
-                newTx.paymentType = matchedPaymentType || PaymentType.Other;
 
                 newTransactions.push(newTx);
             }
