@@ -129,6 +129,133 @@ const EditTransactionModal: React.FC<{
 };
 
 
+const ReconciliationModal: React.FC<{
+  duplicateGroups: Transaction[][];
+  onClose: () => void;
+  onDeleteTransactions: (ids: number[]) => void;
+}> = ({ duplicateGroups, onClose, onDeleteTransactions }) => {
+  const [transactionsToDelete, setTransactionsToDelete] = useState<Set<number>>(new Set());
+
+  const handleToggleDelete = (id: number) => {
+    setTransactionsToDelete(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSmartSelect = (group: Transaction[]) => {
+    const sortedGroup = [...group].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id - b.id);
+    const idsToSelect = sortedGroup.slice(1).map(tx => tx.id);
+    setTransactionsToDelete(prev => {
+      const newSet = new Set(prev);
+      idsToSelect.forEach(id => newSet.add(id));
+      return newSet;
+    });
+  };
+
+  const isDeleteDisabled = useMemo(() => {
+    if (transactionsToDelete.size === 0) return true;
+    for (const group of duplicateGroups) {
+      if (group.every(tx => transactionsToDelete.has(tx.id))) {
+        return true;
+      }
+    }
+    return false;
+  }, [transactionsToDelete, duplicateGroups]);
+
+  const handleDelete = () => {
+    if (isDeleteDisabled) {
+        if (transactionsToDelete.size === 0) {
+            alert('No transactions selected for deletion.');
+        } else {
+            alert('You cannot delete all transactions in a group. Please keep at least one.');
+        }
+        return;
+    }
+    
+    if (window.confirm(`Are you sure you want to delete ${transactionsToDelete.size} selected transaction(s)? This action cannot be undone.`)) {
+        onDeleteTransactions(Array.from(transactionsToDelete));
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4" aria-modal="true" role="dialog">
+      <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <h2 className="text-2xl font-bold mb-4 text-brand-text">Reconcile Duplicate Transactions</h2>
+        <p className="text-sm text-gray-600 mb-6">The following groups of transactions appear to be duplicates based on matching Payment Type, Transaction ID, and Amount. Please review and select the records you wish to delete. You must keep at least one transaction in each group.</p>
+        
+        <div className="flex-grow overflow-y-auto pr-4 space-y-6">
+          {duplicateGroups.map((group, index) => (
+            <div key={index} className="border border-gray-200 rounded-lg p-4">
+              <div className="sm:flex sm:justify-between sm:items-center mb-3">
+                <div>
+                    <h4 className="font-semibold text-lg text-brand-secondary">Duplicate Group {index + 1}</h4>
+                    <p className="text-xs text-gray-500">
+                        {group[0].paymentType} / ID: {group[0].transactionId} / Amount: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(group[0].amount)}
+                    </p>
+                </div>
+                <button onClick={() => handleSmartSelect(group)} className="mt-2 sm:mt-0 text-sm bg-brand-accent/20 text-brand-primary hover:bg-brand-accent/30 font-semibold py-1 px-3 rounded-full">
+                    Keep Oldest, Select Rest
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="w-12 p-2" aria-label="Select"></th>
+                      <th className="p-2 text-left font-medium text-gray-500">Date</th>
+                      <th className="p-2 text-left font-medium text-gray-500">Classmate</th>
+                      <th className="p-2 text-left font-medium text-gray-500">Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.map(tx => (
+                      <tr key={tx.id} className={`${transactionsToDelete.has(tx.id) ? 'bg-red-50' : ''}`}>
+                        <td className="p-2 text-center">
+                            <input 
+                                type="checkbox" 
+                                className="h-4 w-4 text-brand-primary focus:ring-brand-secondary border-gray-300 rounded"
+                                checked={transactionsToDelete.has(tx.id)}
+                                onChange={() => handleToggleDelete(tx.id)}
+                                aria-label={`Select transaction ${tx.id} for deletion`}
+                            />
+                        </td>
+                        <td className="p-2 whitespace-nowrap">{new Date(tx.date).toLocaleDateString()}</td>
+                        <td className="p-2 whitespace-nowrap font-medium">{tx.classmateName}</td>
+                        <td className="p-2 whitespace-nowrap">{tx.description}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex justify-end space-x-4 pt-6 border-t mt-6">
+          <button type="button" onClick={onClose} className="py-2 px-6 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
+          <button 
+            type="button" 
+            onClick={handleDelete}
+            disabled={isDeleteDisabled}
+            className="py-2 px-6 bg-danger text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            title={isDeleteDisabled ? 'You must select at least one transaction and keep at least one per group.' : ''}
+          >
+            Delete Selected ({transactionsToDelete.size})
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+
 const Admin: React.FC = () => {
   const { transactions, addTransaction, updateTransaction, deleteTransaction, clearTransactions, announcements, addAnnouncement, deleteAnnouncement, setLogo, subtitle, setSubtitle, integrationSettings } = useData();
   
@@ -142,6 +269,9 @@ const Admin: React.FC = () => {
   const [uploadStatus, setUploadStatus] = useState<Record<string, string>>({});
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  const [showReconciliationModal, setShowReconciliationModal] = useState(false);
+  const [foundDuplicates, setFoundDuplicates] = useState<Transaction[][]>([]);
 
   const handleManualTxChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -287,6 +417,29 @@ const Admin: React.FC = () => {
       }
   }
 
+  const handleReconcileClick = () => {
+    const potentialDuplicates = transactions.filter(tx => tx.transactionId && tx.paymentType && tx.transactionId.trim() !== '');
+
+    const groups = new Map<string, Transaction[]>();
+
+    potentialDuplicates.forEach(tx => {
+        const key = `${tx.paymentType}|${tx.transactionId!.trim().toUpperCase()}|${tx.amount}`;
+        if (!groups.has(key)) {
+            groups.set(key, []);
+        }
+        groups.get(key)!.push(tx);
+    });
+
+    const duplicateGroups = Array.from(groups.values()).filter(group => group.length > 1);
+    
+    if (duplicateGroups.length > 0) {
+        setFoundDuplicates(duplicateGroups);
+        setShowReconciliationModal(true);
+    } else {
+        alert('No duplicate transactions found based on Payment Type, Transaction ID, and Amount.');
+    }
+  };
+
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => 
       t.classmateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -402,7 +555,18 @@ const Admin: React.FC = () => {
 
       <div className="mt-8">
         <AdminCard title="Manage All Transactions">
-          <input type="text" placeholder="Search by name or description..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm mb-4"/>
+          <div className="sm:flex sm:items-center sm:justify-between mb-4">
+            <input type="text" placeholder="Search by name or description..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full sm:w-auto border-gray-300 rounded-md shadow-sm"/>
+            <button 
+              onClick={handleReconcileClick}
+              className="mt-2 sm:mt-0 w-full sm:w-auto flex items-center justify-center gap-2 py-2 px-4 bg-brand-secondary text-white rounded-md hover:bg-brand-primary"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2l4.45-1.483a1 1 0 011.212 1.212L18.324 11.4l4.938 1.646a1 1 0 01-.434 1.898l-5.457-1.819-2.23 4.46a1 1 0 01-1.789 0l-2.23-4.46-5.457 1.819a1 1 0 01-.434-1.898L7.676 11.4 6.193 6.93a1 1 0 011.212-1.212l4.45 1.483.179-4.457A1 1 0 0112 2z" clipRule="evenodd" />
+              </svg>
+              Reconcile Duplicates
+            </button>
+          </div>
           <div className="overflow-x-auto max-h-[500px]">
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-gray-50 sticky top-0">
@@ -447,6 +611,17 @@ const Admin: React.FC = () => {
           onSave={(updatedTx) => {
             updateTransaction(updatedTx);
             setEditingTransaction(null);
+          }}
+        />
+      )}
+      {showReconciliationModal && (
+        <ReconciliationModal
+          duplicateGroups={foundDuplicates}
+          onClose={() => setShowReconciliationModal(false)}
+          onDeleteTransactions={(ids) => {
+            ids.forEach(id => deleteTransaction(id));
+            setShowReconciliationModal(false);
+            alert(`${ids.length} duplicate transaction(s) deleted successfully.`);
           }}
         />
       )}
