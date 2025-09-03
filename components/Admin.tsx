@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useData } from '../context/DataContext';
 import { PaymentCategory, Transaction, Announcement, IntegrationSettings, PaymentType } from '../types';
+import Papa from 'papaparse';
 
 // Generic card component for the admin panel sections
 const AdminCard: React.FC<{ title: string; children: React.ReactNode; borderColor?: string }> = ({ title, children, borderColor = 'border-b' }) => (
@@ -373,21 +374,76 @@ const Admin: React.FC = () => {
   };
   
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-       if (type === 'logo') {
-         const reader = new FileReader();
-         reader.onloadend = () => {
-           setLogo(reader.result as string);
-           setUploadStatus(prev => ({...prev, logo: `Logo '${file.name}' uploaded!`}));
-         };
-         reader.readAsDataURL(file);
-      } else {
-        setUploadStatus(prev => ({...prev, [type]: `Simulating upload for '${file.name}'...`}));
-        setTimeout(() => {
-          setUploadStatus(prev => ({...prev, [type]: `Successfully processed '${file.name}'!`}));
-        }, 2000);
-      }
+    if (!e.target.files || !e.target.files[0]) {
+      return;
+    }
+    const file = e.target.files[0];
+
+    if (type === 'logo') {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogo(reader.result as string);
+        setUploadStatus(prev => ({...prev, logo: `Logo '${file.name}' uploaded!`}));
+      };
+      reader.readAsDataURL(file);
+    } else if (type === 'excel') {
+      setUploadStatus(prev => ({...prev, excel: `Processing '${file.name}'...`}));
+      
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          try {
+            let importedCount = 0;
+            (results.data as any[]).forEach(row => {
+              // Normalize headers (case-insensitive, ignore spaces)
+              const normalizedRow: {[key: string]: any} = {};
+              for (const key in row) {
+                  normalizedRow[key.trim().toLowerCase().replace(/\s/g, '')] = row[key];
+              }
+
+              const amountStr = normalizedRow.amount || normalizedRow.debit || normalizedRow.credit || '0';
+              const amount = parseFloat(amountStr.replace(/[^0-9.-]+/g,""));
+
+              const name = normalizedRow.classmatename || normalizedRow.name;
+
+              if (!normalizedRow.date || !name || isNaN(amount) || amount === 0) {
+                  console.warn('Skipping invalid row:', row);
+                  return; // Skip rows without essential data
+              }
+
+              const categoryString = normalizedRow.category || 'Simple-Deposit';
+              const category = Object.values(PaymentCategory).find(c => c.toLowerCase() === categoryString.toLowerCase()) || PaymentCategory.SimpleDeposit;
+              
+              const newTransaction: Omit<Transaction, 'id'> = {
+                date: new Date(normalizedRow.date).toISOString().split('T')[0],
+                classmateName: name,
+                amount: amount,
+                category: category,
+                description: normalizedRow.description || `${category} - Imported`,
+                paymentType: PaymentType.ImportedExcel,
+                transactionId: normalizedRow.transactionid || undefined,
+              };
+
+              addTransaction(newTransaction);
+              importedCount++;
+            });
+
+            if (importedCount > 0) {
+                setUploadStatus(prev => ({...prev, excel: `Successfully imported ${importedCount} transactions from '${file.name}'!`}));
+            } else {
+                setUploadStatus(prev => ({...prev, excel: `Could not find any valid transactions to import from '${file.name}'. Please check the file format.`}));
+            }
+          } catch (error) {
+            console.error("Error processing CSV data:", error);
+            setUploadStatus(prev => ({...prev, excel: `Error processing '${file.name}'. Please check the console for details.`}));
+          }
+        },
+        error: (error: any) => {
+          console.error("PapaParse error:", error);
+          setUploadStatus(prev => ({...prev, excel: `Failed to parse '${file.name}': ${error.message}`}));
+        }
+      });
     }
   };
   
