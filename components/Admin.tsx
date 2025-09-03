@@ -1,7 +1,9 @@
+
 import React, { useState, useMemo, useRef } from 'react';
 import { useData } from '../context/DataContext';
 import { PaymentCategory, Transaction, Announcement, IntegrationSettings, PaymentType } from '../types';
 import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 
 // Generic card component for the admin panel sections
 const AdminCard: React.FC<{ title: string; children: React.ReactNode; borderColor?: string }> = ({ title, children, borderColor = 'border-b' }) => (
@@ -255,13 +257,45 @@ const ReconciliationModal: React.FC<{
   );
 };
 
-const parseDate = (dateStr: string): Date | null => {
-  if (!dateStr || typeof dateStr !== 'string') return null;
+// Helper function to parse amounts, including accounting-style negatives like (123.45)
+const parseAmount = (value: any): number => {
+  if (value === null || value === undefined) return NaN;
+  if (typeof value === 'number') return value;
+  
+  const str = String(value).trim();
+  if (str === '') return NaN;
+  
+  const isParenthesesNegative = str.startsWith('(') && str.endsWith(')');
+  
+  // Remove currency symbols, commas, parentheses for parsing
+  const cleanedStr = str.replace(/[^0-9.-]/g, '');
+  let amount = parseFloat(cleanedStr);
+
+  if (isNaN(amount)) return NaN;
+  
+  // If it was in parentheses, ensure the value is negative.
+  if (isParenthesesNegative && amount > 0) {
+    amount = -amount;
+  }
+  
+  return amount;
+};
+
+const parseDate = (dateStr: any): Date | null => {
+  if (!dateStr) return null;
+  // If the date is already a Date object (from XLSX parsing), return it.
+  if (dateStr instanceof Date) {
+    return dateStr;
+  }
+  if (typeof dateStr !== 'string') return null;
 
   // Try standard parsing first (handles YYYY-MM-DD, MM/DD/YYYY etc.)
   let date = new Date(dateStr);
   if (!isNaN(date.getTime())) {
-    return date;
+    // Basic validation for dates like '10/16/1971' being valid
+    if (date.getFullYear() > 1900) {
+      return date;
+    }
   }
   
   // Try custom format like "6-Jun-09"
@@ -405,82 +439,100 @@ const Admin: React.FC = () => {
   };
   
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
-    if (!e.target.files || !e.target.files[0]) {
-      return;
-    }
+    if (!e.target.files || !e.target.files[0]) return;
     const file = e.target.files[0];
 
     if (type === 'logo') {
       const reader = new FileReader();
       reader.onloadend = () => {
         setLogo(reader.result as string);
-        setUploadStatus(prev => ({...prev, logo: `Logo '${file.name}' uploaded!`}));
+        setUploadStatus(prev => ({ ...prev, logo: `Logo '${file.name}' uploaded!` }));
       };
       reader.readAsDataURL(file);
-    } else if (type === 'excel') {
-      setUploadStatus(prev => ({...prev, excel: `Processing '${file.name}'...`}));
-      
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          try {
-            let importedCount = 0;
-            (results.data as any[]).forEach((row, index) => {
-              // Normalize headers (case-insensitive, ignore spaces)
-              const normalizedRow: {[key: string]: any} = {};
-              for (const key in row) {
-                  normalizedRow[key.trim().toLowerCase().replace(/\s/g, '')] = row[key];
-              }
+      return;
+    }
 
-              const amountStr = normalizedRow.amount || normalizedRow.debit || normalizedRow.credit || '0';
-              const amount = parseFloat(amountStr.replace(/[^0-9.-]+/g,""));
-              
-              const name = normalizedRow.classmate || normalizedRow.classmatename || normalizedRow.name;
-              
-              const parsedDate = parseDate(normalizedRow.date);
+    if (type === 'excel') {
+      setUploadStatus(prev => ({ ...prev, excel: `Processing '${file.name}'...` }));
 
-              if (!parsedDate || !name || isNaN(amount)) {
-                  console.warn(`Skipping invalid row #${index + 2}:`, {row, parsedDate, name, amount});
-                  return; // Skip rows without essential data
-              }
-
-              const categoryString = normalizedRow.category || 'Simple-Deposit';
-              // Find case-insensitive match, then fallback to SimpleDeposit
-              const category = Object.values(PaymentCategory).find(c => c.toLowerCase() === categoryString.toLowerCase().trim()) || PaymentCategory.SimpleDeposit;
-              
-              const paymentTypeString = normalizedRow.paymenttype || '';
-              const paymentType = Object.values(PaymentType).find(pt => pt.toLowerCase().replace(/[^a-z0-9]/g, '') === paymentTypeString.toLowerCase().replace(/[^a-z0-9]/g, '')) || PaymentType.ImportedExcel;
-
-              const newTransaction: Omit<Transaction, 'id'> = {
-                date: parsedDate.toISOString().split('T')[0],
-                classmateName: name.trim(),
-                amount: amount,
-                category: category,
-                description: normalizedRow.description || `${category} - Imported`,
-                paymentType: paymentType,
-                transactionId: normalizedRow.transactionid || undefined,
-              };
-
-              addTransaction(newTransaction);
-              importedCount++;
-            });
-
-            if (importedCount > 0) {
-                setUploadStatus(prev => ({...prev, excel: `Successfully imported ${importedCount} transactions from '${file.name}'!`}));
-            } else {
-                setUploadStatus(prev => ({...prev, excel: `Could not find any valid transactions to import from '${file.name}'. Please check the file format.`}));
+      const processImportedData = (data: any[]) => {
+        try {
+          let importedCount = 0;
+          data.forEach((row, index) => {
+            const normalizedRow: { [key: string]: any } = {};
+            for (const key in row) {
+              normalizedRow[key.trim().toLowerCase().replace(/\s/g, '')] = row[key];
             }
-          } catch (error) {
-            console.error("Error processing CSV data:", error);
-            setUploadStatus(prev => ({...prev, excel: `Error processing '${file.name}'. Please check the console for details.`}));
+
+            const amount = parseAmount(normalizedRow.amount);
+            const name = normalizedRow.classmate || normalizedRow.classmatename || normalizedRow.name;
+            const parsedDate = parseDate(normalizedRow.date);
+
+            if (!parsedDate || !name || isNaN(amount)) {
+              console.warn(`Skipping invalid row #${index + 2}:`, { row, parsedDate, name, amount });
+              return;
+            }
+
+            const categoryString = normalizedRow.category || 'Simple-Deposit';
+            const category = Object.values(PaymentCategory).find(c => c.toLowerCase() === String(categoryString).toLowerCase().trim()) || PaymentCategory.SimpleDeposit;
+            
+            const paymentTypeString = normalizedRow.paymenttype || '';
+            const paymentType = Object.values(PaymentType).find(pt => pt.toLowerCase().replace(/[^a-z0-9]/g, '') === String(paymentTypeString).toLowerCase().replace(/[^a-z0-9]/g, '')) || PaymentType.ImportedExcel;
+
+            const newTransaction: Omit<Transaction, 'id'> = {
+              date: parsedDate.toISOString().split('T')[0],
+              classmateName: String(name).trim(),
+              amount: amount,
+              category: category,
+              description: normalizedRow.description || `${category} - Imported`,
+              paymentType: paymentType,
+              transactionId: normalizedRow.transactionid || undefined,
+            };
+
+            addTransaction(newTransaction);
+            importedCount++;
+          });
+
+          if (importedCount > 0) {
+            setUploadStatus(prev => ({ ...prev, excel: `Successfully imported ${importedCount} transactions from '${file.name}'!` }));
+          } else {
+            setUploadStatus(prev => ({ ...prev, excel: `Could not find any valid transactions to import from '${file.name}'. Please check the file format.` }));
           }
-        },
-        error: (error: any) => {
-          console.error("PapaParse error:", error);
-          setUploadStatus(prev => ({...prev, excel: `Failed to parse '${file.name}': ${error.message}`}));
+        } catch (error) {
+          console.error("Error processing imported data:", error);
+          setUploadStatus(prev => ({ ...prev, excel: `Error processing '${file.name}'. Please check the console for details.` }));
         }
-      });
+      };
+
+      const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+
+      if (isExcel) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const data = new Uint8Array(event.target!.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+            processImportedData(jsonData);
+          } catch (error) {
+            console.error("Error parsing Excel file:", error);
+            setUploadStatus(prev => ({ ...prev, excel: `Failed to parse Excel file '${file.name}'.` }));
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } else { // Assume CSV
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => processImportedData(results.data),
+          error: (error: any) => {
+            console.error("PapaParse error:", error);
+            setUploadStatus(prev => ({ ...prev, excel: `Failed to parse CSV file '${file.name}': ${error.message}` }));
+          }
+        });
+      }
     }
   };
   
@@ -654,7 +706,7 @@ const Admin: React.FC = () => {
               onClick={handleReconcileClick}
               className="mt-2 sm:mt-0 w-full sm:w-auto flex items-center justify-center gap-2 py-2 px-4 bg-brand-secondary text-white rounded-md hover:bg-brand-primary"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0_0_20_20" fill="currentColor">
                 <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2l4.45-1.483a1 1 0 011.212 1.212L18.324 11.4l4.938 1.646a1 1 0 01-.434 1.898l-5.457-1.819-2.23 4.46a1 1 0 01-1.789 0l-2.23-4.46-5.457 1.819a1 1 0 01-.434-1.898L7.676 11.4 6.193 6.93a1 1 0 011.212-1.212l4.45 1.483.179-4.457A1 1 0 0112 2z" clipRule="evenodd" />
               </svg>
               Reconcile Duplicates
