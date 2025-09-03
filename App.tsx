@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { DataProvider } from './context/DataContext';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
@@ -13,35 +13,105 @@ import type { User, Transaction, Announcement, IntegrationSettings, IntegrationS
 import { generateMockTransactions } from './services/mockData';
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [logo, setLogo] = useState<string>('https://picsum.photos/seed/alumni/100/100');
-  const [subtitle, setSubtitle] = useState<string>('A.E. Beach High C/o 89 Bulldogs');
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const storedUser = localStorage.getItem('alumniApp-user');
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (e) {
+      console.error("Failed to parse user from localStorage", e);
+      return null;
+    }
+  });
+  useEffect(() => {
+    try {
+      if (user) {
+        localStorage.setItem('alumniApp-user', JSON.stringify(user));
+      } else {
+        localStorage.removeItem('alumniApp-user');
+      }
+    } catch (e) {
+      console.error("Failed to save user to localStorage", e);
+    }
+  }, [user]);
+
+  const [logo, setLogo] = useState<string>(() => localStorage.getItem('alumniApp-logo') || 'https://picsum.photos/seed/alumni/100/100');
+  useEffect(() => localStorage.setItem('alumniApp-logo', logo), [logo]);
+
+  const [subtitle, setSubtitle] = useState<string>(() => localStorage.getItem('alumniApp-subtitle') || 'A.E. Beach High C/o 89 Bulldogs');
+  useEffect(() => localStorage.setItem('alumniApp-subtitle', subtitle), [subtitle]);
+
   const [currentPage, setCurrentPage] = useState('dashboard');
 
-  const [transactions, setTransactions] = useState<Transaction[]>(generateMockTransactions());
-  const [announcements, setAnnouncements] = useState<Announcement[]>([
-    {
-      id: 1,
-      title: 'Upcoming Class Reunion!',
-      content: 'Join us for our 20-year reunion on October 15th! Early bird tickets are now available. A down payment of $50 is required by August 31st to secure your spot. We can\'t wait to see you there!',
-      date: '2024-07-15',
-      type: 'text'
-    },
-    {
-      id: 2,
-      title: 'Class Fundraiser for John Doe',
-      content: 'We are raising funds to support our classmate John Doe during a difficult time. Any donation, big or small, is greatly appreciated.',
-      date: '2024-06-20',
-      type: 'text'
-    },
-  ]);
-  
-  const [integrationSettings, setIntegrationSettings] = useState<IntegrationSettings>({
-    cashApp: { connected: false, identifier: '' },
-    payPal: { connected: false, identifier: '' },
-    zelle: { connected: false, identifier: '' },
-    bank: { connected: false, identifier: '' },
+  const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    try {
+      const storedTransactions = localStorage.getItem('alumniApp-transactions');
+      return storedTransactions ? JSON.parse(storedTransactions) : generateMockTransactions();
+    } catch (e) {
+      console.error("Failed to parse transactions from localStorage", e);
+      return generateMockTransactions();
+    }
   });
+  useEffect(() => {
+    try {
+      localStorage.setItem('alumniApp-transactions', JSON.stringify(transactions));
+    } catch (e) {
+      console.error("Failed to save transactions to localStorage", e);
+    }
+  }, [transactions]);
+
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
+    try {
+      const stored = localStorage.getItem('alumniApp-announcements');
+      return stored ? JSON.parse(stored) : [
+        {
+          id: 1,
+          title: 'Upcoming Class Reunion!',
+          content: 'Join us for our 20-year reunion on October 15th! Early bird tickets are now available. A down payment of $50 is required by August 31st to secure your spot. We can\'t wait to see you there!',
+          date: '2024-07-15',
+          type: 'text'
+        },
+        {
+          id: 2,
+          title: 'Class Fundraiser for John Doe',
+          content: 'We are raising funds to support our classmate John Doe during a difficult time. Any donation, big or small, is greatly appreciated.',
+          date: '2024-06-20',
+          type: 'text'
+        },
+      ];
+    } catch (e) {
+      console.error("Failed to parse announcements from localStorage", e);
+      return []; // Return empty on error
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('alumniApp-announcements', JSON.stringify(announcements));
+    } catch (e) {
+      console.error("Failed to save announcements to localStorage", e);
+    }
+  }, [announcements]);
+  
+  const [integrationSettings, setIntegrationSettings] = useState<IntegrationSettings>(() => {
+    try {
+      const stored = localStorage.getItem('alumniApp-integrationSettings');
+      return stored ? JSON.parse(stored) : {
+        cashApp: { connected: false, identifier: '' },
+        payPal: { connected: false, identifier: '' },
+        zelle: { connected: false, identifier: '' },
+        bank: { connected: false, identifier: '' },
+      };
+    } catch (e) {
+      console.error("Failed to parse integrationSettings from localStorage", e);
+      return { cashApp: { connected: false, identifier: '' }, payPal: { connected: false, identifier: '' }, zelle: { connected: false, identifier: '' }, bank: { connected: false, identifier: '' } };
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('alumniApp-integrationSettings', JSON.stringify(integrationSettings));
+    } catch (e) {
+      console.error("Failed to save integrationSettings to localStorage", e);
+    }
+  }, [integrationSettings]);
 
   const handleLogin = (isAdmin: boolean) => {
     setUser({
