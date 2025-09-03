@@ -9,7 +9,19 @@ const Transactions: React.FC = () => {
   const [sortConfig, setSortConfig] = useState<{ key: keyof Transaction; direction: 'asc' | 'desc' } | null>({ key: 'date', direction: 'desc' });
 
   const userTransactions = useMemo(() => {
-    return transactions.filter(t => t.classmateName === user?.name);
+    if (!user?.name) {
+      return [];
+    }
+    const userNameParts = user.name.toLowerCase().split(' ').filter(p => p); // Get non-empty parts
+
+    return transactions.filter(t => {
+      if (!t.classmateName) {
+        return false;
+      }
+      const transactionNameLower = t.classmateName.toLowerCase();
+      // Check if every part of the user's name is present in the transaction's classmateName
+      return userNameParts.every(part => transactionNameLower.includes(part));
+    });
   }, [transactions, user]);
 
   const filteredTransactions = useMemo(() => {
