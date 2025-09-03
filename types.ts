@@ -20,6 +20,7 @@ export enum PaymentType {
   CashApp = 'CashApp',
   Zelle = 'Zelle',
   Cash = 'CASH',
+  BankCard = 'Bank Card',
   Other = 'Other',
 }
 

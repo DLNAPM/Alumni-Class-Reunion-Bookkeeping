@@ -43,6 +43,7 @@ export const generateMockTransactions = (): Transaction[] => {
       PaymentType.Zelle,
       PaymentType.Suntrust,
       PaymentType.Truist,
+      PaymentType.BankCard,
     ];
 
     if (typesWithTxId.includes(paymentType)) {
