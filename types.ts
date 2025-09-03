@@ -71,7 +71,9 @@ export interface DataContextType {
   transactions: Transaction[];
   addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
   updateTransaction: (updatedTransaction: Transaction) => void;
+  updateTransactions: (updatedTransactions: Transaction[]) => void;
   deleteTransaction: (transactionId: number) => void;
+  deleteTransactions: (transactionIds: number[]) => void;
   clearTransactions: () => void;
   announcements: Announcement[];
   addAnnouncement: (announcement: Omit<Announcement, 'id'>) => void;

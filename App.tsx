@@ -45,7 +45,11 @@ const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     try {
       const storedTransactions = localStorage.getItem('alumniApp-transactions');
-      return storedTransactions ? JSON.parse(storedTransactions) : generateMockTransactions();
+      // Load mock data only if there's nothing in storage
+      if (storedTransactions === null) {
+          return generateMockTransactions();
+      }
+      return JSON.parse(storedTransactions);
     } catch (e) {
       console.error("Failed to parse transactions from localStorage", e);
       return generateMockTransactions();
@@ -132,15 +136,25 @@ const App: React.FC = () => {
   }, []);
 
   const addTransaction = useCallback((transaction: Omit<Transaction, 'id'>) => {
-    setTransactions(prev => [{ ...transaction, id: Date.now() }, ...prev]);
+    setTransactions(prev => [{ ...transaction, id: Date.now() + Math.random() }, ...prev]);
   }, []);
   
   const updateTransaction = useCallback((updatedTransaction: Transaction) => {
     setTransactions(prev => prev.map(t => t.id === updatedTransaction.id ? updatedTransaction : t));
   }, []);
 
+  const updateTransactions = useCallback((transactionsToUpdate: Transaction[]) => {
+    const updatesMap = new Map(transactionsToUpdate.map(t => [t.id, t]));
+    setTransactions(prev => prev.map(t => updatesMap.get(t.id) || t));
+  }, []);
+
   const deleteTransaction = useCallback((transactionId: number) => {
     setTransactions(prev => prev.filter(t => t.id !== transactionId));
+  }, []);
+
+  const deleteTransactions = useCallback((transactionIds: number[]) => {
+    const idsToDelete = new Set(transactionIds);
+    setTransactions(prev => prev.filter(t => !idsToDelete.has(t.id)));
   }, []);
   
   const clearTransactions = useCallback(() => {
@@ -174,7 +188,9 @@ const App: React.FC = () => {
     transactions,
     addTransaction,
     updateTransaction,
+    updateTransactions,
     deleteTransaction,
+    deleteTransactions,
     clearTransactions,
     announcements,
     addAnnouncement,
@@ -183,7 +199,7 @@ const App: React.FC = () => {
     integrationSettings,
     updateIntegrationSettings,
     updateUserName,
-  }), [user, logo, subtitle, transactions, announcements, addTransaction, updateTransaction, deleteTransaction, clearTransactions, addAnnouncement, deleteAnnouncement, integrationSettings, updateIntegrationSettings, updateUserName]);
+  }), [user, logo, subtitle, transactions, announcements, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, addAnnouncement, deleteAnnouncement, integrationSettings, updateIntegrationSettings, updateUserName]);
 
   const renderPage = () => {
     switch (currentPage) {

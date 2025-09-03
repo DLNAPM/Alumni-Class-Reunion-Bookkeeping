@@ -1,15 +1,20 @@
-
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { PaymentCategory, Transaction, PaymentType, IntegrationSettings, Announcement } from '../types';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 
 type EditableTransaction = Omit<Transaction, 'id' | 'date'> & { id?: number; date: string };
+type BulkEditData = {
+  category?: PaymentCategory;
+  paymentType?: PaymentType;
+  classmateName?: string;
+};
+
 
 const Admin: React.FC = () => {
   const { 
-    transactions, addTransaction, updateTransaction, deleteTransaction, clearTransactions, 
+    transactions, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, 
     logo, setLogo, subtitle, setSubtitle, integrationSettings, updateIntegrationSettings,
     announcements, addAnnouncement, deleteAnnouncement
   } = useData();
@@ -34,6 +39,10 @@ const Admin: React.FC = () => {
   const [reconciliationModalOpen, setReconciliationModalOpen] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState<Transaction[][]>([]);
   const [transactionsToDelete, setTransactionsToDelete] = useState<Set<number>>(new Set());
+  
+  const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set());
+  const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false);
+  const [bulkEditData, setBulkEditData] = useState<BulkEditData>({});
 
   // Customization state
   const [tempLogo, setTempLogo] = useState(logo);
@@ -52,7 +61,7 @@ const Admin: React.FC = () => {
 
   const handleAddNewTransaction = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newTransaction.classmateName && newTransaction.amount) {
+    if (newTransaction.classmateName && newTransaction.amount !== undefined) {
       addTransaction(newTransaction);
       setNewTransaction({
         date: new Date().toISOString().split('T')[0],
@@ -123,6 +132,7 @@ const Admin: React.FC = () => {
       direction = 'desc';
     }
     setSortConfig({ key, direction });
+    setSelectedTransactions(new Set());
   };
   
   const getSortIndicator = (key: keyof Transaction) => {
@@ -161,7 +171,9 @@ const Admin: React.FC = () => {
     // Handle '6-Jun-09' format
     const parts = String(dateValue).match(/(\d{1,2})-(\w{3})-(\d{2,4})/);
     if (parts) {
-      const parsedDate = new Date(`${parts[1]} ${parts[2]} 20${parts[3]}`);
+      const year = parseInt(parts[3]);
+      const fullYear = year < 50 ? 2000 + year : 1900 + year;
+      const parsedDate = new Date(`${parts[1]} ${parts[2]} ${fullYear}`);
       if (!isNaN(parsedDate.getTime())) {
         return parsedDate.toISOString().split('T')[0];
       }
@@ -219,33 +231,26 @@ const Admin: React.FC = () => {
                 const date = dateKey ? parseDate(row[dateKey]) : null;
                 const amount = amountKey ? parseAmount(row[amountKey]) : 0;
                 
-                // Skip rows without at least a date and a non-zero amount if there is an amount column
-                if (!date || (amountKey && amount === 0 && Object.values(row).some(val => val !== ""))) {
-                    if (date && amountKey && amount === 0) { // Allow zero amount transactions if they have a date.
-                       // continue;
-                    } else if (!date) {
-                       continue;
-                    }
+                if (!date && !(nameKey && row[nameKey])) {
+                  continue; // Skip rows without a date or a name
                 }
 
                 const newTx: Omit<Transaction, 'id'> = {
-                    date: date,
-                    classmateName: nameKey ? row[nameKey] || 'N/A' : 'N/A',
+                    date: date || new Date().toISOString().split('T')[0],
+                    classmateName: nameKey ? String(row[nameKey] || 'N/A') : 'N/A',
                     amount: amount,
-                    description: descKey ? row[descKey] || '' : '',
-                    category: (catKey ? row[catKey] : PaymentCategory.SimpleDeposit) as PaymentCategory,
-                    paymentType: (paymentTypeKey ? row[paymentTypeKey] : PaymentType.Other) as PaymentType,
+                    description: descKey ? String(row[descKey] || '') : '',
+                    category: (catKey && row[catKey] ? row[catKey] : PaymentCategory.SimpleDeposit) as PaymentCategory,
+                    paymentType: (paymentTypeKey && row[paymentTypeKey] ? row[paymentTypeKey] : PaymentType.Other) as PaymentType,
                     transactionId: transactionIdKey ? String(row[transactionIdKey] || '') : undefined,
                 };
 
                 if (!Object.values(PaymentCategory).includes(newTx.category)) {
-                    // Fix: Assign a valid PaymentCategory enum value instead of a PaymentType value.
                     newTx.category = PaymentCategory.SimpleDeposit;
                 }
                 const paymentTypeStr = String(newTx.paymentType).toLowerCase();
                 const matchedPaymentType = Object.values(PaymentType).find(pt => String(pt).toLowerCase() === paymentTypeStr);
                 newTx.paymentType = matchedPaymentType || PaymentType.Other;
-
 
                 newTransactions.push(newTx);
             }
@@ -303,10 +308,10 @@ const Admin: React.FC = () => {
     });
   };
 
-  const handleBulkDelete = () => {
+  const handleReconciliationDelete = () => {
     if (transactionsToDelete.size === 0) return;
     if (window.confirm(`Are you sure you want to delete ${transactionsToDelete.size} duplicate transaction(s)?`)) {
-      transactionsToDelete.forEach(id => deleteTransaction(id));
+      deleteTransactions(Array.from(transactionsToDelete));
       setReconciliationModalOpen(false);
     }
   };
@@ -319,6 +324,64 @@ const Admin: React.FC = () => {
           toDelete.forEach(id => newSet.add(id));
           return newSet;
       });
+  };
+  
+  // Bulk Selection Handlers
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedTransactions(new Set(sortedTransactions.map(t => t.id)));
+    } else {
+      setSelectedTransactions(new Set());
+    }
+  };
+
+  const handleSelectTransaction = (id: number) => {
+    setSelectedTransactions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const handleBulkDelete = () => {
+    if (window.confirm(`Are you sure you want to delete ${selectedTransactions.size} selected transactions? This action cannot be undone.`)) {
+      deleteTransactions(Array.from(selectedTransactions));
+      setSelectedTransactions(new Set());
+    }
+  };
+
+  const handleBulkEditChange = (field: keyof BulkEditData, value: string) => {
+    setBulkEditData(prev => ({
+      ...prev,
+      [field]: value || undefined
+    }));
+  };
+
+  const handleApplyBulkEdit = () => {
+    const changes = Object.fromEntries(
+      Object.entries(bulkEditData).filter(([, value]) => value !== undefined)
+    );
+
+    if (Object.keys(changes).length === 0) {
+      alert("No changes specified.");
+      return;
+    }
+
+    const transactionsToUpdate = transactions
+      .filter(t => selectedTransactions.has(t.id))
+      .map(t => ({ ...t, ...changes }));
+
+    if (transactionsToUpdate.length > 0) {
+      updateTransactions(transactionsToUpdate);
+    }
+
+    setIsBulkEditModalOpen(false);
+    setSelectedTransactions(new Set());
+    setBulkEditData({});
   };
 
   const handleCustomizationSave = () => {
@@ -364,6 +427,14 @@ const Admin: React.FC = () => {
       alert('Integration settings saved!');
   };
 
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (selectAllRef.current) {
+      const isIndeterminate = selectedTransactions.size > 0 && selectedTransactions.size < sortedTransactions.length;
+      selectAllRef.current.indeterminate = isIndeterminate;
+    }
+  }, [selectedTransactions, sortedTransactions.length]);
+
   return (
     <div className="space-y-8">
       <h2 className="text-3xl font-bold text-brand-text">Admin Panel</h2>
@@ -396,10 +467,29 @@ const Admin: React.FC = () => {
                 <span className="font-medium">{importStatus.type.charAt(0).toUpperCase() + importStatus.type.slice(1)}:</span> {importStatus.message}
               </div>
             )}
+             {selectedTransactions.size > 0 && (
+              <div className="bg-brand-secondary text-white p-3 rounded-lg shadow-md mb-4 flex items-center justify-between sticky top-0 z-10">
+                <span className="font-semibold">{selectedTransactions.size} transaction(s) selected</span>
+                <div className="flex gap-4 items-center">
+                  <button onClick={() => setIsBulkEditModalOpen(true)} className="bg-yellow-500 hover:bg-yellow-600 px-3 py-1 rounded-md text-sm font-medium">Edit Selected</button>
+                  <button onClick={handleBulkDelete} className="bg-danger hover:bg-red-700 px-3 py-1 rounded-md text-sm font-medium">Delete Selected</button>
+                  <button onClick={() => setSelectedTransactions(new Set())} className="text-white hover:text-gray-200 text-sm font-light">Clear Selection</button>
+                </div>
+              </div>
+            )}
             <div className="overflow-x-auto max-h-[600px]">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50 sticky top-0">
+                <thead className="bg-gray-50 sticky top-0 z-5">
                   <tr>
+                    <th className="px-4 py-2 w-12">
+                       <input
+                          ref={selectAllRef}
+                          type="checkbox"
+                          className="h-4 w-4 text-brand-primary border-gray-300 rounded focus:ring-brand-primary"
+                          onChange={handleSelectAll}
+                          checked={sortedTransactions.length > 0 && selectedTransactions.size === sortedTransactions.length}
+                        />
+                    </th>
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('date')}>Date {getSortIndicator('date')}</th>
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('classmateName')}>Classmate {getSortIndicator('classmateName')}</th>
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('category')}>Category {getSortIndicator('category')}</th>
@@ -411,7 +501,15 @@ const Admin: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {sortedTransactions.map(t => (
-                    <tr key={t.id}>
+                    <tr key={t.id} className={selectedTransactions.has(t.id) ? 'bg-brand-accent/20' : ''}>
+                      <td className="px-4 py-2">
+                         <input
+                            type="checkbox"
+                            className="h-4 w-4 text-brand-primary border-gray-300 rounded focus:ring-brand-primary"
+                            checked={selectedTransactions.has(t.id)}
+                            onChange={() => handleSelectTransaction(t.id)}
+                          />
+                      </td>
                       <td className="px-4 py-2 whitespace-nowrap">{new Date(t.date).toLocaleDateString()}</td>
                       <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900">{t.classmateName}</td>
                       <td className="px-4 py-2 whitespace-nowrap">{t.category}</td>
@@ -425,7 +523,7 @@ const Admin: React.FC = () => {
                     </tr>
                   ))}
                    {sortedTransactions.length === 0 && (
-                        <tr><td colSpan={7} className="text-center py-10 text-gray-500">No transactions match your search.</td></tr>
+                        <tr><td colSpan={8} className="text-center py-10 text-gray-500">No transactions match your search.</td></tr>
                     )}
                 </tbody>
               </table>
@@ -528,14 +626,12 @@ const Admin: React.FC = () => {
               </div>
           </div>
 
-
           {/* Danger Zone */}
           <div className="bg-white p-6 rounded-lg shadow-md border-2 border-dashed border-danger">
             <h3 className="text-xl font-semibold mb-4 text-danger">Danger Zone</h3>
             <button onClick={handleClearTransactions} className="w-full bg-danger text-white py-2 px-4 rounded-md hover:bg-red-700">Delete All Transactions</button>
           </div>
         </div>
-
       </div>
 
       {/* Edit Modal */}
@@ -563,13 +659,37 @@ const Admin: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Bulk Edit Modal */}
+      {isBulkEditModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+            <h3 className="text-xl font-semibold">Bulk Edit Transactions</h3>
+            <p className="text-sm text-gray-600 my-2">Editing {selectedTransactions.size} transactions. Only fill in fields you want to change. Blank fields will be ignored.</p>
+            <div className="space-y-4 mt-4">
+              <select value={bulkEditData.category || ''} onChange={e => handleBulkEditChange('category', e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm">
+                <option value="">-- No Change to Category --</option>
+                {Object.values(PaymentCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+              </select>
+              <select value={bulkEditData.paymentType || ''} onChange={e => handleBulkEditChange('paymentType', e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm">
+                <option value="">-- No Change to Payment Type --</option>
+                {Object.values(PaymentType).map(pt => <option key={pt} value={pt}>{pt}</option>)}
+              </select>
+              <input type="text" placeholder="Change Classmate Name" defaultValue={bulkEditData.classmateName || ''} onBlur={e => handleBulkEditChange('classmateName', e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm" />
+            </div>
+            <div className="flex justify-end mt-6 space-x-4">
+              <button onClick={() => { setIsBulkEditModalOpen(false); setBulkEditData({}); }} className="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300">Cancel</button>
+              <button onClick={handleApplyBulkEdit} className="bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary">Apply Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
        {/* Reconciliation Modal */}
       {reconciliationModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center border-b pb-3 mb-4">
                 <h3 className="text-xl font-semibold">Reconcile Duplicates</h3>
-                <button onClick={() => setReconciliationModalOpen(false)} className="text-gray-500 hover:text-gray-800">&times;</button>
+                <button onClick={() => setReconciliationModalOpen(false)} className="text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
             </div>
             {duplicateGroups.length > 0 ? (
             <>
@@ -609,7 +729,7 @@ const Admin: React.FC = () => {
             <div className="flex justify-end mt-4 pt-4 border-t space-x-4">
               <p className="text-sm text-gray-600 self-center">{transactionsToDelete.size} transaction(s) selected for deletion.</p>
               <button onClick={() => setReconciliationModalOpen(false)} className="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300">Cancel</button>
-              <button onClick={handleBulkDelete} disabled={transactionsToDelete.size === 0} className="bg-danger text-white py-2 px-4 rounded-md hover:bg-red-700 disabled:bg-gray-400">Delete Selected</button>
+              <button onClick={handleReconciliationDelete} disabled={transactionsToDelete.size === 0} className="bg-danger text-white py-2 px-4 rounded-md hover:bg-red-700 disabled:bg-gray-400">Delete Selected</button>
             </div>
             </>
             ) : (
