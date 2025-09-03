@@ -7,6 +7,9 @@ export enum PaymentCategory {
   ClassmateSupport = 'Classmate Support',
   Benevolence = 'Benevolence',
   SimpleDeposit = 'Simple-Deposit',
+  Picnic = 'Picnic',
+  Expense = 'Expense',
+  BankMaintFee = 'Bank Maint Fee',
 }
 
 export enum PaymentType {

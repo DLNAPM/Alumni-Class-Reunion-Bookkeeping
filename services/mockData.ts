@@ -16,9 +16,16 @@ export const generateMockTransactions = (): Transaction[] => {
     const randomDate = new Date(startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime()));
     const category = categories[Math.floor(Math.random() * categories.length)];
     const paymentType = paymentTypes[Math.floor(Math.random() * paymentTypes.length)];
-    const amount = category === PaymentCategory.Fundraiser 
-      ? Math.floor(Math.random() * 200) + 20 
-      : Math.floor(Math.random() * 100) + 25;
+    
+    let amount: number;
+    if ([PaymentCategory.Expense, PaymentCategory.BankMaintFee].includes(category)) {
+      amount = -(Math.floor(Math.random() * 150) + 7); // Expenses are negative
+    } else if (category === PaymentCategory.Fundraiser) {
+      amount = Math.floor(Math.random() * 200) + 20;
+    } else {
+      amount = Math.floor(Math.random() * 100) + 25;
+    }
+
 
     const transaction: Transaction = {
       id: i,
