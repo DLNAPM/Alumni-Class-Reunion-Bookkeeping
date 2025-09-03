@@ -30,14 +30,15 @@ export const generateMockTransactions = (): Transaction[] => {
       classmateName: classmates[Math.floor(Math.random() * classmates.length)],
     };
     
-    const importedTypes = [
-      PaymentType.ImportedCashApp,
-      PaymentType.ImportedPayPal,
-      PaymentType.ImportedZelle,
-      PaymentType.ImportedBank,
+    const typesWithTxId = [
+      PaymentType.PayPal,
+      PaymentType.CashApp,
+      PaymentType.Zelle,
+      PaymentType.Suntrust,
+      PaymentType.Truist,
     ];
 
-    if (importedTypes.includes(paymentType)) {
+    if (typesWithTxId.includes(paymentType)) {
       transaction.transactionId = Math.random().toString(36).substring(2, 15).toUpperCase();
     }
     

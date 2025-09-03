@@ -10,13 +10,13 @@ export enum PaymentCategory {
 }
 
 export enum PaymentType {
-  CreditCard = 'Credit Card',
-  ManualEntry = 'Manual Entry',
-  ImportedCashApp = 'Imported - CashApp',
-  ImportedPayPal = 'Imported - PayPal',
-  ImportedZelle = 'Imported - Zelle',
-  ImportedBank = 'Imported - Bank',
-  ImportedExcel = 'Imported - Excel/CSV',
+  Suntrust = 'Suntrust',
+  Truist = 'Truist',
+  PayPal = 'PayPal',
+  CashApp = 'CashApp',
+  Zelle = 'Zelle',
+  Cash = 'CASH',
+  Other = 'Other',
 }
 
 export interface Transaction {

@@ -1,145 +1,297 @@
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { useData } from '../context/DataContext';
-import { PaymentCategory, Transaction, Announcement, IntegrationSettings, PaymentType } from '../types';
+import { PaymentCategory, Transaction, PaymentType, IntegrationSettings, Announcement } from '../types';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 
-// Generic card component for the admin panel sections
-const AdminCard: React.FC<{ title: string; children: React.ReactNode; borderColor?: string }> = ({ title, children, borderColor = 'border-b' }) => (
-  <div className="bg-white p-6 rounded-lg shadow-md">
-    <h3 className={`text-xl font-semibold mb-4 text-brand-text ${borderColor} pb-2`}>{title}</h3>
-    {children}
-  </div>
-);
+type EditableTransaction = Omit<Transaction, 'id' | 'date'> & { id?: number; date: string };
 
-// Integration Settings Component
-const IntegrationManager: React.FC<{
-  service: keyof IntegrationSettings;
-  title: string;
-  label: string;
-  placeholder: string;
-}> = ({ service, title, label, placeholder }) => {
-  const { integrationSettings, updateIntegrationSettings } = useData();
-  const [identifier, setIdentifier] = useState(integrationSettings[service].identifier);
+const Admin: React.FC = () => {
+  const { 
+    transactions, addTransaction, updateTransaction, deleteTransaction, clearTransactions, 
+    logo, setLogo, subtitle, setSubtitle, integrationSettings, updateIntegrationSettings,
+    announcements, addAnnouncement, deleteAnnouncement
+  } = useData();
+  
+  const [editingTransaction, setEditingTransaction] = useState<EditableTransaction | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [filter, setFilter] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Transaction; direction: 'asc' | 'desc' } | null>({ key: 'date', direction: 'desc' });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importStatus, setImportStatus] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  const handleConnect = () => {
-    if (identifier) {
-      updateIntegrationSettings(service, { connected: true, identifier });
-      alert(`Successfully connected to ${title}!`);
-    } else {
-      alert(`Please enter a valid ${label}.`);
+  const [newTransaction, setNewTransaction] = useState<Omit<Transaction, 'id'>>({
+    date: new Date().toISOString().split('T')[0],
+    classmateName: '',
+    amount: 0,
+    description: '',
+    category: PaymentCategory.Dues,
+    paymentType: PaymentType.Other,
+    transactionId: '',
+  });
+
+  const [reconciliationModalOpen, setReconciliationModalOpen] = useState(false);
+  const [duplicateGroups, setDuplicateGroups] = useState<Transaction[][]>([]);
+  const [transactionsToDelete, setTransactionsToDelete] = useState<Set<number>>(new Set());
+
+  // Customization state
+  const [tempLogo, setTempLogo] = useState(logo);
+  const [tempSubtitle, setTempSubtitle] = useState(subtitle);
+
+  // Announcement state
+  const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', type: 'text' as 'text' | 'facebook', url: '', imageUrl: '' });
+
+  // Integration state
+  const [tempIntegrationSettings, setTempIntegrationSettings] = useState(integrationSettings);
+
+  const handleNewTransactionChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setNewTransaction(prev => ({ ...prev, [name]: name === 'amount' ? parseFloat(value) : value }));
+  };
+
+  const handleAddNewTransaction = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newTransaction.classmateName && newTransaction.amount) {
+      addTransaction(newTransaction);
+      setNewTransaction({
+        date: new Date().toISOString().split('T')[0],
+        classmateName: '',
+        amount: 0,
+        description: '',
+        category: PaymentCategory.Dues,
+        paymentType: PaymentType.Other,
+        transactionId: '',
+      });
     }
   };
 
-  const handleDisconnect = () => {
-    updateIntegrationSettings(service, { connected: false, identifier: '' });
-    setIdentifier('');
+  const openEditModal = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setIsEditModalOpen(true);
   };
 
-  const isConnected = integrationSettings[service].connected;
+  const closeEditModal = () => {
+    setEditingTransaction(null);
+    setIsEditModalOpen(false);
+  };
 
-  return (
-    <div>
-      <h4 className="font-semibold text-gray-800">{title}</h4>
-      {isConnected ? (
-        <div className="mt-2 flex items-center justify-between bg-green-50 p-3 rounded-md">
-          <div>
-            <p className="text-sm font-medium text-green-800">Connected</p>
-            <p className="text-sm text-gray-600 truncate">{integrationSettings[service].identifier}</p>
-          </div>
-          <button onClick={handleDisconnect} className="text-sm font-medium text-red-600 hover:text-red-800">Disconnect</button>
-        </div>
-      ) : (
-        <div className="mt-2 space-y-2">
-          <label className="block text-sm font-medium text-gray-700">{label}</label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
-              placeholder={placeholder}
-              className="flex-grow w-full border-gray-300 rounded-md shadow-sm text-sm"
-            />
-            <button onClick={handleConnect} className="py-2 px-4 bg-brand-secondary text-white rounded-md hover:bg-brand-primary text-sm whitespace-nowrap">Connect</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-
-// Modal for editing transactions
-const EditTransactionModal: React.FC<{
-  transaction: Transaction;
-  onClose: () => void;
-  onSave: (transaction: Transaction) => void;
-}> = ({ transaction, onClose, onSave }) => {
-  const [formData, setFormData] = useState(transaction);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: name === 'amount' ? parseFloat(value) || 0 : value }));
+  const handleUpdateTransaction = () => {
+    if (editingTransaction && editingTransaction.id) {
+      updateTransaction(editingTransaction as Transaction);
+      closeEditModal();
+    }
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave(formData);
+  const handleDeleteTransaction = (id: number) => {
+    if (window.confirm('Are you sure you want to delete this transaction?')) {
+      deleteTransaction(id);
+    }
+  };
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(t => 
+      t.classmateName.toLowerCase().includes(filter.toLowerCase()) ||
+      t.description.toLowerCase().includes(filter.toLowerCase()) ||
+      t.category.toLowerCase().includes(filter.toLowerCase()) ||
+      t.paymentType.toLowerCase().includes(filter.toLowerCase()) ||
+      (t.transactionId && t.transactionId.toLowerCase().includes(filter.toLowerCase()))
+    );
+  }, [transactions, filter]);
+
+  const sortedTransactions = useMemo(() => {
+    let sortableItems = [...filteredTransactions];
+    if (sortConfig !== null) {
+      sortableItems.sort((a, b) => {
+        const valA = a[sortConfig.key] || '';
+        const valB = b[sortConfig.key] || '';
+        if (valA < valB) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (valA > valB) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [filteredTransactions, sortConfig]);
+
+  const requestSort = (key: keyof Transaction) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
   };
   
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-      <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-6">Edit Transaction</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Classmate Name</label>
-            <input type="text" name="classmateName" value={formData.classmateName} onChange={handleChange} required className="mt-1 w-full border-gray-300 rounded-md shadow-sm"/>
-          </div>
-           <div>
-            <label className="block text-sm font-medium text-gray-700">Amount</label>
-            <input type="number" name="amount" value={formData.amount} onChange={handleChange} required className="mt-1 w-full border-gray-300 rounded-md shadow-sm" step="0.01"/>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Category</label>
-            <select name="category" value={formData.category} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md shadow-sm">
-              {Object.values(PaymentCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Payment Type</label>
-            <select name="paymentType" value={formData.paymentType} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md shadow-sm">
-                {Object.values(PaymentType).map(pt => <option key={pt} value={pt}>{pt}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Description (Optional)</label>
-            <input type="text" name="description" value={formData.description} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md shadow-sm"/>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Transaction ID (Optional)</label>
-            <input type="text" name="transactionId" value={formData.transactionId || ''} onChange={handleChange} className="mt-1 w-full border-gray-300 rounded-md shadow-sm"/>
-          </div>
-          <div className="flex justify-end space-x-4 pt-4">
-            <button type="button" onClick={onClose} className="py-2 px-4 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
-            <button type="submit" className="py-2 px-4 bg-brand-primary text-white rounded-md hover:bg-brand-secondary">Save Changes</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
+  const getSortIndicator = (key: keyof Transaction) => {
+    if (!sortConfig || sortConfig.key !== key) return null;
+    return sortConfig.direction === 'asc' ? '▲' : '▼';
+  };
+
+  const handleClearTransactions = () => {
+    if (window.confirm('Are you sure you want to delete ALL transactions? This action cannot be undone.')) {
+      clearTransactions();
+    }
+  };
+  
+  const parseAmount = (amountStr: any): number => {
+    if (typeof amountStr === 'number') return amountStr;
+    if (typeof amountStr !== 'string') return 0;
+    const cleaned = amountStr.replace(/[$,\s]/g, '').trim();
+    if (cleaned.startsWith('(') && cleaned.endsWith(')')) {
+      return -parseFloat(cleaned.substring(1, cleaned.length - 1));
+    }
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
+  };
+  
+  const parseDate = (dateValue: any): string | null => {
+    if (!dateValue) return null;
+    if (typeof dateValue === 'number') { // Excel date serial number
+        const excelEpoch = new Date(1899, 11, 30);
+        const date = new Date(excelEpoch.getTime() + dateValue * 86400000);
+        return date.toISOString().split('T')[0];
+    }
+    const date = new Date(dateValue);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+    // Handle '6-Jun-09' format
+    const parts = String(dateValue).match(/(\d{1,2})-(\w{3})-(\d{2,4})/);
+    if (parts) {
+      const parsedDate = new Date(`${parts[1]} ${parts[2]} 20${parts[3]}`);
+      if (!isNaN(parsedDate.getTime())) {
+        return parsedDate.toISOString().split('T')[0];
+      }
+    }
+    return null;
+  };
+  
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImportStatus({ message: `Processing '${file.name}'...`, type: 'info' });
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+        try {
+            const data = e.target?.result;
+            let jsonData: any[];
+
+            if (file.name.endsWith('.csv')) {
+                const result = Papa.parse(data as string, { header: true, skipEmptyLines: true });
+                jsonData = result.data;
+            } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const sheetName = workbook.SheetNames[0];
+                jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+            } else {
+                throw new Error("Unsupported file type. Please upload a CSV or Excel file.");
+            }
+
+            const newTransactions: Omit<Transaction, 'id'>[] = [];
+            const header = Object.keys(jsonData[0] || {}).map(h => h.toLowerCase().replace(/\s+/g, ''));
+            
+            const findHeader = (possibleNames: string[]) => {
+              for (const name of possibleNames) {
+                  const normalizedName = name.toLowerCase().replace(/\s+/g, '');
+                  const index = header.findIndex(h => h.includes(normalizedName));
+                  if (index !== -1) {
+                      return Object.keys(jsonData[0])[index];
+                  }
+              }
+              return null;
+            };
+
+            const dateKey = findHeader(['date']);
+            const nameKey = findHeader(['classmate', 'name']);
+            const amountKey = findHeader(['amount']);
+            const descKey = findHeader(['description', 'desc']);
+            const catKey = findHeader(['category']);
+            const paymentTypeKey = findHeader(['paymenttype', 'type']);
+            const transactionIdKey = findHeader(['transactionid', 'txid']);
+
+            for (const row of jsonData) {
+                const date = dateKey ? parseDate(row[dateKey]) : null;
+                const amount = amountKey ? parseAmount(row[amountKey]) : 0;
+                
+                // Skip rows without at least a date and a non-zero amount if there is an amount column
+                if (!date || (amountKey && amount === 0 && Object.values(row).some(val => val !== ""))) {
+                    if (date && amountKey && amount === 0) { // Allow zero amount transactions if they have a date.
+                       // continue;
+                    } else if (!date) {
+                       continue;
+                    }
+                }
+
+                const newTx: Omit<Transaction, 'id'> = {
+                    date: date,
+                    classmateName: nameKey ? row[nameKey] || 'N/A' : 'N/A',
+                    amount: amount,
+                    description: descKey ? row[descKey] || '' : '',
+                    category: (catKey ? row[catKey] : PaymentCategory.SimpleDeposit) as PaymentCategory,
+                    paymentType: (paymentTypeKey ? row[paymentTypeKey] : PaymentType.Other) as PaymentType,
+                    transactionId: transactionIdKey ? String(row[transactionIdKey] || '') : undefined,
+                };
+
+                if (!Object.values(PaymentCategory).includes(newTx.category)) {
+                    // Fix: Assign a valid PaymentCategory enum value instead of a PaymentType value.
+                    newTx.category = PaymentCategory.SimpleDeposit;
+                }
+                const paymentTypeStr = String(newTx.paymentType).toLowerCase();
+                const matchedPaymentType = Object.values(PaymentType).find(pt => String(pt).toLowerCase() === paymentTypeStr);
+                newTx.paymentType = matchedPaymentType || PaymentType.Other;
 
 
-const ReconciliationModal: React.FC<{
-  duplicateGroups: Transaction[][];
-  onClose: () => void;
-  onDeleteTransactions: (ids: number[]) => void;
-}> = ({ duplicateGroups, onClose, onDeleteTransactions }) => {
-  const [transactionsToDelete, setTransactionsToDelete] = useState<Set<number>>(new Set());
+                newTransactions.push(newTx);
+            }
 
-  const handleToggleDelete = (id: number) => {
+            if (newTransactions.length > 0) {
+                newTransactions.forEach(addTransaction);
+                setImportStatus({ message: `Successfully imported ${newTransactions.length} transactions from '${file.name}'.`, type: 'success' });
+            } else {
+                setImportStatus({ message: `Could not find any valid transactions to import from '${file.name}'. Please check the file format.`, type: 'error' });
+            }
+        } catch (error) {
+            console.error("File processing error:", error);
+            setImportStatus({ message: `Error processing '${file.name}': ${error instanceof Error ? error.message : String(error)}`, type: 'error' });
+        } finally {
+            if (fileInputRef.current) {
+                fileInputRef.current.value = ''; // Reset file input
+            }
+        }
+    };
+    
+    if (file.name.endsWith('.csv')) {
+        reader.readAsText(file);
+    } else {
+        reader.readAsBinaryString(file);
+    }
+  };
+
+  const findDuplicates = useCallback(() => {
+    const duplicatesMap = new Map<string, Transaction[]>();
+    transactions.forEach(t => {
+      if (t.transactionId && t.paymentType) {
+        const key = `${t.paymentType}-${t.transactionId}-${t.amount}`;
+        if (!duplicatesMap.has(key)) {
+          duplicatesMap.set(key, []);
+        }
+        duplicatesMap.get(key)!.push(t);
+      }
+    });
+    
+    const groups = Array.from(duplicatesMap.values()).filter(group => group.length > 1);
+    setDuplicateGroups(groups);
+    setTransactionsToDelete(new Set());
+    setReconciliationModalOpen(true);
+  }, [transactions]);
+
+  const toggleTransactionToDelete = (id: number) => {
     setTransactionsToDelete(prev => {
       const newSet = new Set(prev);
       if (newSet.has(id)) {
@@ -151,624 +303,320 @@ const ReconciliationModal: React.FC<{
     });
   };
 
-  const handleSmartSelect = (group: Transaction[]) => {
-    const sortedGroup = [...group].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id - b.id);
-    const idsToSelect = sortedGroup.slice(1).map(tx => tx.id);
-    setTransactionsToDelete(prev => {
-      const newSet = new Set(prev);
-      idsToSelect.forEach(id => newSet.add(id));
-      return newSet;
-    });
-  };
-
-  const isDeleteDisabled = useMemo(() => {
-    if (transactionsToDelete.size === 0) return true;
-    for (const group of duplicateGroups) {
-      if (group.every(tx => transactionsToDelete.has(tx.id))) {
-        return true;
-      }
-    }
-    return false;
-  }, [transactionsToDelete, duplicateGroups]);
-
-  const handleDelete = () => {
-    if (isDeleteDisabled) {
-        if (transactionsToDelete.size === 0) {
-            alert('No transactions selected for deletion.');
-        } else {
-            alert('You cannot delete all transactions in a group. Please keep at least one.');
-        }
-        return;
-    }
-    
-    if (window.confirm(`Are you sure you want to delete ${transactionsToDelete.size} selected transaction(s)? This action cannot be undone.`)) {
-        onDeleteTransactions(Array.from(transactionsToDelete));
+  const handleBulkDelete = () => {
+    if (transactionsToDelete.size === 0) return;
+    if (window.confirm(`Are you sure you want to delete ${transactionsToDelete.size} duplicate transaction(s)?`)) {
+      transactionsToDelete.forEach(id => deleteTransaction(id));
+      setReconciliationModalOpen(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4" aria-modal="true" role="dialog">
-      <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-        <h2 className="text-2xl font-bold mb-4 text-brand-text">Reconcile Duplicate Transactions</h2>
-        <p className="text-sm text-gray-600 mb-6">The following groups of transactions appear to be duplicates based on matching Payment Type, Transaction ID, and Amount. Please review and select the records you wish to delete. You must keep at least one transaction in each group.</p>
-        
-        <div className="flex-grow overflow-y-auto pr-4 space-y-6">
-          {duplicateGroups.map((group, index) => (
-            <div key={index} className="border border-gray-200 rounded-lg p-4">
-              <div className="sm:flex sm:justify-between sm:items-center mb-3">
-                <div>
-                    <h4 className="font-semibold text-lg text-brand-secondary">Duplicate Group {index + 1}</h4>
-                    <p className="text-xs text-gray-500">
-                        {group[0].paymentType} / ID: {group[0].transactionId} / Amount: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(group[0].amount)}
-                    </p>
-                </div>
-                <button onClick={() => handleSmartSelect(group)} className="mt-2 sm:mt-0 text-sm bg-brand-accent/20 text-brand-primary hover:bg-brand-accent/30 font-semibold py-1 px-3 rounded-full">
-                    Keep Oldest, Select Rest
-                </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="w-12 p-2" aria-label="Select"></th>
-                      <th className="p-2 text-left font-medium text-gray-500">Date</th>
-                      <th className="p-2 text-left font-medium text-gray-500">Classmate</th>
-                      <th className="p-2 text-left font-medium text-gray-500">Description</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {group.map(tx => (
-                      <tr key={tx.id} className={`${transactionsToDelete.has(tx.id) ? 'bg-red-50' : ''}`}>
-                        <td className="p-2 text-center">
-                            <input 
-                                type="checkbox" 
-                                className="h-4 w-4 text-brand-primary focus:ring-brand-secondary border-gray-300 rounded"
-                                checked={transactionsToDelete.has(tx.id)}
-                                onChange={() => handleToggleDelete(tx.id)}
-                                aria-label={`Select transaction ${tx.id} for deletion`}
-                            />
-                        </td>
-                        <td className="p-2 whitespace-nowrap">{new Date(tx.date).toLocaleDateString()}</td>
-                        <td className="p-2 whitespace-nowrap font-medium">{tx.classmateName}</td>
-                        <td className="p-2 whitespace-nowrap">{tx.description}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex justify-end space-x-4 pt-6 border-t mt-6">
-          <button type="button" onClick={onClose} className="py-2 px-6 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
-          <button 
-            type="button" 
-            onClick={handleDelete}
-            disabled={isDeleteDisabled}
-            className="py-2 px-6 bg-danger text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-            title={isDeleteDisabled ? 'You must select at least one transaction and keep at least one per group.' : ''}
-          >
-            Delete Selected ({transactionsToDelete.size})
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Helper function to parse amounts, including accounting-style negatives like (123.45)
-const parseAmount = (value: any): number => {
-  if (value === null || value === undefined) return NaN;
-  if (typeof value === 'number') return value;
-  
-  const str = String(value).trim();
-  if (str === '') return NaN;
-  
-  const isParenthesesNegative = str.startsWith('(') && str.endsWith(')');
-  
-  // Remove currency symbols, commas, parentheses for parsing
-  const cleanedStr = str.replace(/[^0-9.-]/g, '');
-  let amount = parseFloat(cleanedStr);
-
-  if (isNaN(amount)) return NaN;
-  
-  // If it was in parentheses, ensure the value is negative.
-  if (isParenthesesNegative && amount > 0) {
-    amount = -amount;
-  }
-  
-  return amount;
-};
-
-const parseDate = (dateStr: any): Date | null => {
-  if (!dateStr) return null;
-  // If the date is already a Date object (from XLSX parsing), return it.
-  if (dateStr instanceof Date) {
-    return dateStr;
-  }
-  if (typeof dateStr !== 'string') return null;
-
-  // Try standard parsing first (handles YYYY-MM-DD, MM/DD/YYYY etc.)
-  let date = new Date(dateStr);
-  if (!isNaN(date.getTime())) {
-    // Basic validation for dates like '10/16/1971' being valid
-    if (date.getFullYear() > 1900) {
-      return date;
-    }
-  }
-  
-  // Try custom format like "6-Jun-09"
-  const parts = dateStr.trim().match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
-  if (parts) {
-    const day = parseInt(parts[1], 10);
-    const monthStr = parts[2].charAt(0).toUpperCase() + parts[2].slice(1).toLowerCase();
-    const yearPart = parseInt(parts[3], 10);
-    const year = yearPart < 100 ? 2000 + yearPart : yearPart;
-
-    const monthIndex = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].indexOf(monthStr);
-
-    if (day > 0 && monthIndex >= 0 && year > 1900) {
-      // Use UTC to avoid timezone issues during parsing
-      date = new Date(Date.UTC(year, monthIndex, day));
-      if (!isNaN(date.getTime())) {
-        return date;
-      }
-    }
-  }
-
-  console.warn(`Could not parse date: "${dateStr}"`);
-  return null;
-};
-
-
-const Admin: React.FC = () => {
-  const { transactions, addTransaction, updateTransaction, deleteTransaction, clearTransactions, announcements, addAnnouncement, deleteAnnouncement, setLogo, subtitle, setSubtitle, integrationSettings } = useData();
-  
-  const [manualTx, setManualTx] = useState({ classmateName: '', amount: '', category: PaymentCategory.Dues, description: '', transactionId: '' });
-  const [announcement, setAnnouncement] = useState({ title: '', content: '' });
-  const [announcementImage, setAnnouncementImage] = useState<File | null>(null);
-  const [announcementImagePreview, setAnnouncementImagePreview] = useState<string | null>(null);
-  const announcementImageInputRef = useRef<HTMLInputElement>(null);
-
-  const [fbPost, setFbPost] = useState({ title: '', url: '' });
-  const [uploadStatus, setUploadStatus] = useState<Record<string, string>>({});
-  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const [showReconciliationModal, setShowReconciliationModal] = useState(false);
-  const [foundDuplicates, setFoundDuplicates] = useState<Transaction[][]>([]);
-
-  const handleManualTxChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setManualTx(prev => ({ ...prev, [name]: value }));
-  };
-  
-  const handleAnnouncementChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setAnnouncement(prev => ({ ...prev, [name]: value }));
-  };
-  
-  const handleAnnouncementImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files[0]) {
-          const file = e.target.files[0];
-          setAnnouncementImage(file);
-          const reader = new FileReader();
-          reader.onloadend = () => {
-              setAnnouncementImagePreview(reader.result as string);
-          };
-          reader.readAsDataURL(file);
-      } else {
-          setAnnouncementImage(null);
-          setAnnouncementImagePreview(null);
-      }
-  };
-
-  const handleFbPostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFbPost(prev => ({...prev, [name]: value }));
-  }
-
-  const handleManualTxSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (manualTx.classmateName && manualTx.amount) {
-      addTransaction({
-          date: new Date().toISOString().split('T')[0],
-          description: manualTx.description || `${manualTx.category} (Manual)`,
-          category: manualTx.category,
-          amount: parseFloat(manualTx.amount),
-          classmateName: manualTx.classmateName,
-          paymentType: PaymentType.ManualEntry,
-          transactionId: manualTx.transactionId || undefined,
+  const selectForDeletion = (group: Transaction[]) => {
+      const sortedGroup = [...group].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const toDelete = sortedGroup.slice(1).map(t => t.id);
+      setTransactionsToDelete(prev => {
+          const newSet = new Set(prev);
+          toDelete.forEach(id => newSet.add(id));
+          return newSet;
       });
-      alert('Transaction added successfully!');
-      setManualTx({ classmateName: '', amount: '', category: PaymentCategory.Dues, description: '', transactionId: '' });
-    }
-  };
-  
-  const resetAnnouncementForm = () => {
-      alert('Announcement posted successfully!');
-      setAnnouncement({ title: '', content: '' });
-      setAnnouncementImage(null);
-      setAnnouncementImagePreview(null);
-      if (announcementImageInputRef.current) {
-          announcementImageInputRef.current.value = "";
-      }
   };
 
-  const handleAnnouncementSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if(announcement.title && announcement.content) {
-          const newAnnouncementData: Omit<Announcement, 'id'> = {
-              title: announcement.title,
-              content: announcement.content,
-              date: new Date().toISOString().split('T')[0],
-              type: 'text',
-          };
-
-          if (announcementImage) {
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                  addAnnouncement({
-                      ...newAnnouncementData,
-                      imageUrl: reader.result as string,
-                  });
-                  resetAnnouncementForm();
-              };
-              reader.readAsDataURL(announcementImage);
-          } else {
-              addAnnouncement(newAnnouncementData);
-              resetAnnouncementForm();
-          }
-      }
+  const handleCustomizationSave = () => {
+    setLogo(tempLogo);
+    setSubtitle(tempSubtitle);
+    alert('Customization saved!');
   };
-  
-  const handleFbPostSubmit = (e: React.FormEvent) => {
+
+  const handleAddAnnouncement = (e: React.FormEvent) => {
     e.preventDefault();
-    if (fbPost.title && fbPost.url) {
-      addAnnouncement({
-        title: fbPost.title,
-        content: `Facebook Post: ${fbPost.url}`, // For fallback
+    if(newAnnouncement.title && (newAnnouncement.content || newAnnouncement.url)) {
+      const announcementToAdd: Omit<Announcement, 'id'> = {
+        title: newAnnouncement.title,
+        content: newAnnouncement.content,
         date: new Date().toISOString().split('T')[0],
-        type: 'facebook',
-        url: fbPost.url,
+        type: newAnnouncement.type,
+      };
+      if (newAnnouncement.type === 'facebook' && newAnnouncement.url) {
+        announcementToAdd.url = newAnnouncement.url;
+      }
+      if (newAnnouncement.imageUrl) {
+        announcementToAdd.imageUrl = newAnnouncement.imageUrl;
+      }
+      addAnnouncement(announcementToAdd);
+      setNewAnnouncement({ title: '', content: '', type: 'text', url: '', imageUrl: '' });
+    }
+  };
+  
+  const handleIntegrationSettingsChange = (service: keyof IntegrationSettings, field: keyof IntegrationSettings[keyof IntegrationSettings], value: string | boolean) => {
+      setTempIntegrationSettings(prev => ({
+          ...prev,
+          [service]: {
+              ...prev[service],
+              [field]: value,
+          }
+      }));
+  };
+
+  const saveIntegrationSettings = () => {
+      (Object.keys(tempIntegrationSettings) as Array<keyof IntegrationSettings>).forEach(service => {
+          updateIntegrationSettings(service, tempIntegrationSettings[service]);
       });
-      alert('Facebook post embedded successfully!');
-      setFbPost({ title: '', url: '' });
-    }
+      alert('Integration settings saved!');
   };
-  
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
-    if (!e.target.files || !e.target.files[0]) return;
-    const file = e.target.files[0];
-
-    if (type === 'logo') {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogo(reader.result as string);
-        setUploadStatus(prev => ({ ...prev, logo: `Logo '${file.name}' uploaded!` }));
-      };
-      reader.readAsDataURL(file);
-      return;
-    }
-
-    if (type === 'excel') {
-      setUploadStatus(prev => ({ ...prev, excel: `Processing '${file.name}'...` }));
-
-      const processImportedData = (data: any[]) => {
-        try {
-          let importedCount = 0;
-          data.forEach((row, index) => {
-            const normalizedRow: { [key: string]: any } = {};
-            for (const key in row) {
-              normalizedRow[key.trim().toLowerCase().replace(/\s/g, '')] = row[key];
-            }
-
-            const amount = parseAmount(normalizedRow.amount);
-            const name = normalizedRow.classmate || normalizedRow.classmatename || normalizedRow.name;
-            const parsedDate = parseDate(normalizedRow.date);
-
-            if (!parsedDate || !name || isNaN(amount)) {
-              console.warn(`Skipping invalid row #${index + 2}:`, { row, parsedDate, name, amount });
-              return;
-            }
-
-            const categoryString = normalizedRow.category || 'Simple-Deposit';
-            const category = Object.values(PaymentCategory).find(c => c.toLowerCase() === String(categoryString).toLowerCase().trim()) || PaymentCategory.SimpleDeposit;
-            
-            const paymentTypeString = normalizedRow.paymenttype || '';
-            const paymentType = Object.values(PaymentType).find(pt => pt.toLowerCase().replace(/[^a-z0-9]/g, '') === String(paymentTypeString).toLowerCase().replace(/[^a-z0-9]/g, '')) || PaymentType.ImportedExcel;
-
-            const newTransaction: Omit<Transaction, 'id'> = {
-              date: parsedDate.toISOString().split('T')[0],
-              classmateName: String(name).trim(),
-              amount: amount,
-              category: category,
-              description: normalizedRow.description || `${category} - Imported`,
-              paymentType: paymentType,
-              transactionId: normalizedRow.transactionid || undefined,
-            };
-
-            addTransaction(newTransaction);
-            importedCount++;
-          });
-
-          if (importedCount > 0) {
-            setUploadStatus(prev => ({ ...prev, excel: `Successfully imported ${importedCount} transactions from '${file.name}'!` }));
-          } else {
-            setUploadStatus(prev => ({ ...prev, excel: `Could not find any valid transactions to import from '${file.name}'. Please check the file format.` }));
-          }
-        } catch (error) {
-          console.error("Error processing imported data:", error);
-          setUploadStatus(prev => ({ ...prev, excel: `Error processing '${file.name}'. Please check the console for details.` }));
-        }
-      };
-
-      const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
-
-      if (isExcel) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          try {
-            const data = new Uint8Array(event.target!.result as ArrayBuffer);
-            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet);
-            processImportedData(jsonData);
-          } catch (error) {
-            console.error("Error parsing Excel file:", error);
-            setUploadStatus(prev => ({ ...prev, excel: `Failed to parse Excel file '${file.name}'.` }));
-          }
-        };
-        reader.readAsArrayBuffer(file);
-      } else { // Assume CSV
-        Papa.parse(file, {
-          header: true,
-          skipEmptyLines: true,
-          complete: (results) => processImportedData(results.data),
-          error: (error: any) => {
-            console.error("PapaParse error:", error);
-            setUploadStatus(prev => ({ ...prev, excel: `Failed to parse CSV file '${file.name}': ${error.message}` }));
-          }
-        });
-      }
-    }
-  };
-  
-  const handleImport = (source: string) => {
-      setUploadStatus(prev => ({...prev, [source]: `Simulating import from ${source}...`}));
-      setTimeout(() => {
-        setUploadStatus(prev => ({...prev, [source]: `Successfully imported transactions from ${source}!`}));
-      }, 2500);
-  };
-  
-  const handleDeleteTx = (transactionId: number) => {
-    if (window.confirm('Are you sure you want to delete this transaction? This action cannot be undone.')) {
-      deleteTransaction(transactionId);
-    }
-  };
-  
-  const handleDeleteAnnouncement = (announcementId: number) => {
-      if (window.confirm('Are you sure you want to delete this announcement?')) {
-          deleteAnnouncement(announcementId);
-      }
-  };
-  
-  const handleClearDatabase = () => {
-      if (window.confirm('DANGER: This will delete ALL transaction records and reset the class balance to $0. This action is irreversible. Are you absolutely sure?')) {
-          clearTransactions();
-          alert('All transactions have been cleared.');
-      }
-  }
-
-  const handleReconcileClick = () => {
-    const potentialDuplicates = transactions.filter(tx => tx.transactionId && tx.paymentType && tx.transactionId.trim() !== '');
-
-    const groups = new Map<string, Transaction[]>();
-
-    potentialDuplicates.forEach(tx => {
-        const key = `${tx.paymentType}|${tx.transactionId!.trim().toUpperCase()}|${tx.amount}`;
-        if (!groups.has(key)) {
-            groups.set(key, []);
-        }
-        groups.get(key)!.push(tx);
-    });
-
-    const duplicateGroups = Array.from(groups.values()).filter(group => group.length > 1);
-    
-    if (duplicateGroups.length > 0) {
-        setFoundDuplicates(duplicateGroups);
-        setShowReconciliationModal(true);
-    } else {
-        alert('No duplicate transactions found based on Payment Type, Transaction ID, and Amount.');
-    }
-  };
-
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter(t => 
-      t.classmateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.description.toLowerCase().includes(searchTerm.toLowerCase())
-    ).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, searchTerm]);
 
   return (
     <div className="space-y-8">
-      <h2 className="text-3xl font-bold text-brand-text">Administrator Panel</h2>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="space-y-8">
-          <AdminCard title="App Customization">
-            <div className="space-y-4">
-               <div>
-                  <label className="text-sm font-medium">Update Class Logo</label>
-                  <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'logo')} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-primary hover:file:bg-brand-accent/30"/>
-                  {uploadStatus.logo && <p className="text-sm text-success mt-2">{uploadStatus.logo}</p>}
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Update App Subtitle</label>
-                  <input type="text" value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="e.g., A.E. Beach High C/o 89 Bulldogs" className="mt-1 w-full border-gray-300 rounded-md shadow-sm"/>
-                  <p className="text-xs text-gray-500 mt-1">Appears on the login screen and header.</p>
-                </div>
-            </div>
-          </AdminCard>
-          
-          <AdminCard title="Payment Integration Settings">
-            <div className="space-y-6">
-              <IntegrationManager service="cashApp" title="CashApp" label="$Cashtag" placeholder="$your-cashtag" />
-              <IntegrationManager service="payPal" title="PayPal" label="PayPal.Me Username or Email" placeholder="your-paypal" />
-              <IntegrationManager service="zelle" title="Zelle" label="Email or Phone Number" placeholder="your-email@example.com" />
-              <IntegrationManager service="bank" title="Bank Checking Account" label="Account Number (Last 4 Digits)" placeholder="1234" />
-            </div>
-          </AdminCard>
-          
-          <AdminCard title="Manage Announcements">
-              {/* New Text Announcement */}
-              <form onSubmit={handleAnnouncementSubmit} className="space-y-4 p-4 border rounded-md">
-                  <h4 className="font-semibold">Post a New Announcement</h4>
-                  <input type="text" name="title" placeholder="Announcement Title" value={announcement.title} onChange={handleAnnouncementChange} required className="w-full border-gray-300 rounded-md shadow-sm"/>
-                  <textarea name="content" placeholder="Announcement Content" value={announcement.content} onChange={handleAnnouncementChange} required className="w-full border-gray-300 rounded-md shadow-sm" rows={3}></textarea>
-                  <div>
-                    <label className="text-sm font-medium">Attach an Image (Optional)</label>
-                    <input type="file" accept="image/*" ref={announcementImageInputRef} onChange={handleAnnouncementImageChange} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100"/>
-                  </div>
-                  {announcementImagePreview && <img src={announcementImagePreview} alt="Preview" className="mt-2 h-24 w-auto rounded-md object-cover"/>}
-                  <button type="submit" className="w-full bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary">Post Text Announcement</button>
-              </form>
-              
-              {/* Embed FB Post */}
-               <form onSubmit={handleFbPostSubmit} className="space-y-4 p-4 border rounded-md mt-4">
-                  <h4 className="font-semibold">Embed a Facebook Post</h4>
-                  <input type="text" name="title" placeholder="Post Title (e.g., Reunion Details)" value={fbPost.title} onChange={handleFbPostChange} required className="w-full border-gray-300 rounded-md shadow-sm"/>
-                  <input type="url" name="url" placeholder="Facebook Post URL" value={fbPost.url} onChange={handleFbPostChange} required className="w-full border-gray-300 rounded-md shadow-sm"/>
-                  <button type="submit" className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">Embed Facebook Post</button>
-              </form>
+      <h2 className="text-3xl font-bold text-brand-text">Admin Panel</h2>
 
-              {/* Existing Announcements */}
-              <div className="mt-6 space-y-2">
-                <h4 className="font-semibold border-t pt-4">Existing Announcements</h4>
-                {announcements.map(ann => (
-                  <div key={ann.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-md">
-                    <span className="text-sm truncate pr-2">{ann.title}</span>
-                    <button onClick={() => handleDeleteAnnouncement(ann.id)} className="text-danger hover:text-red-700 font-medium text-sm flex-shrink-0">Delete</button>
-                  </div>
-                ))}
-              </div>
-          </AdminCard>
-          
-           <AdminCard title="Danger Zone" borderColor="border-danger">
-              <p className="text-sm text-gray-600 mb-4">These actions are permanent and cannot be undone. Proceed with caution.</p>
-              <button onClick={handleClearDatabase} className="w-full bg-danger text-white py-2 px-4 rounded-md hover:bg-red-700 font-bold">
-                Zero Out Database (Clear All Transactions)
-              </button>
-          </AdminCard>
-        </div>
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        <div className="space-y-8">
-          <AdminCard title="Import Transactions">
-            <div className="space-y-4">
-                <div>
-                    <label className="text-sm font-medium">Upload Excel/CSV File</label>
-                    <input type="file" accept=".csv, .xlsx, .xls" onChange={(e) => handleFileUpload(e, 'excel')} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-primary hover:file:bg-brand-accent/30"/>
-                    {uploadStatus.excel && <p className="text-sm text-success mt-2">{uploadStatus.excel}</p>}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => handleImport('CashApp')} disabled={!integrationSettings.cashApp.connected} className="bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600 text-sm disabled:bg-gray-400 disabled:cursor-not-allowed">Import from CashApp</button>
-                    <button onClick={() => handleImport('PayPal')} disabled={!integrationSettings.payPal.connected} className="bg-blue-800 text-white py-2 px-4 rounded-md hover:bg-blue-900 text-sm disabled:bg-gray-400 disabled:cursor-not-allowed">Import from PayPal</button>
-                    <button onClick={() => handleImport('Zelle')} disabled={!integrationSettings.zelle.connected} className="bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 text-sm disabled:bg-gray-400 disabled:cursor-not-allowed">Import from Zelle</button>
-                    <button onClick={() => handleImport('Bank')} disabled={!integrationSettings.bank.connected} className="bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600 text-sm disabled:bg-gray-400 disabled:cursor-not-allowed">Import from Bank</button>
-                </div>
-                 {Object.keys(uploadStatus).filter(k => k !== 'logo' && k !== 'excel').map(key => 
-                    uploadStatus[key] && <p key={key} className="text-sm text-success mt-2">{uploadStatus[key]}</p>
-                )}
+        {/* Left Column */}
+        <div className="lg:col-span-2 space-y-8">
+          {/* Manage All Transactions */}
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="sm:flex sm:items-center sm:justify-between mb-4">
+              <h3 className="text-xl font-semibold">Manage All Transactions</h3>
+              <div className="mt-4 sm:mt-0 flex gap-2">
+                <input 
+                  type="text" 
+                  placeholder="Filter transactions..." 
+                  className="w-full sm:w-64 px-3 py-2 border border-gray-300 rounded-md" 
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                />
+                 <button onClick={findDuplicates} className="bg-yellow-500 text-white py-2 px-4 rounded-md hover:bg-yellow-600 whitespace-nowrap">Reconcile Duplicates</button>
+              </div>
             </div>
-          </AdminCard>
-          <AdminCard title="Manually Enter Transaction">
-            <form onSubmit={handleManualTxSubmit} className="space-y-4">
-              <input type="text" name="classmateName" placeholder="Classmate Name" value={manualTx.classmateName} onChange={handleManualTxChange} required className="w-full border-gray-300 rounded-md shadow-sm"/>
-              <input type="number" name="amount" placeholder="Amount" value={manualTx.amount} onChange={handleManualTxChange} required className="w-full border-gray-300 rounded-md shadow-sm" step="0.01"/>
-              <select name="category" value={manualTx.category} onChange={handleManualTxChange} className="w-full border-gray-300 rounded-md shadow-sm">
-                  {Object.values(PaymentCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+             {importStatus && (
+              <div className={`p-4 mb-4 text-sm rounded-lg ${
+                importStatus.type === 'success' ? 'bg-green-100 text-green-700' : 
+                importStatus.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+              }`} role="alert">
+                <span className="font-medium">{importStatus.type.charAt(0).toUpperCase() + importStatus.type.slice(1)}:</span> {importStatus.message}
+              </div>
+            )}
+            <div className="overflow-x-auto max-h-[600px]">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('date')}>Date {getSortIndicator('date')}</th>
+                    <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('classmateName')}>Classmate {getSortIndicator('classmateName')}</th>
+                    <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('category')}>Category {getSortIndicator('category')}</th>
+                    <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('paymentType')}>Payment Type {getSortIndicator('paymentType')}</th>
+                    <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('transactionId')}>Transaction ID {getSortIndicator('transactionId')}</th>
+                    <th className="px-4 py-2 text-right font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('amount')}>Amount {getSortIndicator('amount')}</th>
+                    <th className="px-4 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {sortedTransactions.map(t => (
+                    <tr key={t.id}>
+                      <td className="px-4 py-2 whitespace-nowrap">{new Date(t.date).toLocaleDateString()}</td>
+                      <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900">{t.classmateName}</td>
+                      <td className="px-4 py-2 whitespace-nowrap">{t.category}</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-xs">{t.paymentType}</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-gray-500 truncate max-w-xs" title={t.transactionId}>{t.transactionId || ''}</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-right font-semibold">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(t.amount)}</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
+                        <button onClick={() => openEditModal(t)} className="text-brand-secondary hover:text-brand-primary mr-3">Edit</button>
+                        <button onClick={() => handleDeleteTransaction(t.id)} className="text-danger hover:text-red-700">Delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                   {sortedTransactions.length === 0 && (
+                        <tr><td colSpan={7} className="text-center py-10 text-gray-500">No transactions match your search.</td></tr>
+                    )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+            {/* Manage Announcements */}
+            <div className="bg-white p-6 rounded-lg shadow-md">
+                <h3 className="text-xl font-semibold mb-4">Manage Announcements</h3>
+                <form onSubmit={handleAddAnnouncement} className="space-y-4">
+                  <input type="text" placeholder="Title" value={newAnnouncement.title} onChange={e => setNewAnnouncement({...newAnnouncement, title: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" required />
+                  <select value={newAnnouncement.type} onChange={e => setNewAnnouncement({...newAnnouncement, type: e.target.value as 'text' | 'facebook'})} className="w-full border-gray-300 rounded-md shadow-sm">
+                      <option value="text">Text Announcement</option>
+                      <option value="facebook">Facebook Post</option>
+                  </select>
+                  {newAnnouncement.type === 'text' ? (
+                      <textarea placeholder="Content" value={newAnnouncement.content} onChange={e => setNewAnnouncement({...newAnnouncement, content: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" rows={3}></textarea>
+                  ) : (
+                      <input type="url" placeholder="Facebook Post URL" value={newAnnouncement.url} onChange={e => setNewAnnouncement({...newAnnouncement, url: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" required />
+                  )}
+                  <input type="url" placeholder="Image URL (Optional)" value={newAnnouncement.imageUrl} onChange={e => setNewAnnouncement({...newAnnouncement, imageUrl: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" />
+                  <button type="submit" className="bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary">Add Announcement</button>
+                </form>
+                <div className="mt-6 space-y-2 max-h-60 overflow-y-auto">
+                    <h4 className="font-semibold">Current Announcements</h4>
+                    {announcements.map(ann => (
+                        <div key={ann.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                            <span>{ann.title}</span>
+                            <button onClick={() => deleteAnnouncement(ann.id)} className="text-danger hover:text-red-700 text-sm">Delete</button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+        </div>
+
+        {/* Right Column */}
+        <div className="space-y-8">
+          {/* Manually Enter Transaction */}
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            <h3 className="text-xl font-semibold mb-4">Manually Enter Transaction</h3>
+            <form onSubmit={handleAddNewTransaction} className="space-y-4">
+              <input type="date" name="date" value={newTransaction.date} onChange={handleNewTransactionChange} className="w-full border-gray-300 rounded-md shadow-sm" required />
+              <input type="text" name="classmateName" placeholder="Classmate Name" value={newTransaction.classmateName} onChange={handleNewTransactionChange} className="w-full border-gray-300 rounded-md shadow-sm" required />
+              <input type="number" step="0.01" name="amount" placeholder="Amount" value={newTransaction.amount} onChange={handleNewTransactionChange} className="w-full border-gray-300 rounded-md shadow-sm" required />
+              <textarea name="description" placeholder="Description" value={newTransaction.description} onChange={handleNewTransactionChange} className="w-full border-gray-300 rounded-md shadow-sm" rows={2}></textarea>
+              <select name="category" value={newTransaction.category} onChange={handleNewTransactionChange} className="w-full border-gray-300 rounded-md shadow-sm">
+                {Object.values(PaymentCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
               </select>
-              <input type="text" name="description" placeholder="Description (Optional)" value={manualTx.description} onChange={handleManualTxChange} className="w-full border-gray-300 rounded-md shadow-sm"/>
-              <input type="text" name="transactionId" placeholder="Transaction ID (Optional)" value={manualTx.transactionId} onChange={handleManualTxChange} className="w-full border-gray-300 rounded-md shadow-sm"/>
+               <select name="paymentType" value={newTransaction.paymentType} onChange={handleNewTransactionChange} className="w-full border-gray-300 rounded-md shadow-sm">
+                {Object.values(PaymentType).map(pt => <option key={pt} value={pt}>{pt}</option>)}
+              </select>
+              <input type="text" name="transactionId" placeholder="Transaction ID (Optional)" value={newTransaction.transactionId} onChange={handleNewTransactionChange} className="w-full border-gray-300 rounded-md shadow-sm" />
               <button type="submit" className="w-full bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary">Add Transaction</button>
             </form>
-          </AdminCard>
+          </div>
+
+          {/* Import Transactions */}
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            <h3 className="text-xl font-semibold mb-4">Import Transactions</h3>
+            <p className="text-sm text-gray-600 mb-4">Upload a CSV or Excel file to bulk import transactions.</p>
+            <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-primary hover:file:bg-brand-accent/30" />
+          </div>
+
+          {/* Application Customization */}
+          <div className="bg-white p-6 rounded-lg shadow-md">
+              <h3 className="text-xl font-semibold mb-4">Application Customization</h3>
+              <div className="space-y-4">
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700">Logo URL</label>
+                      <input type="text" value={tempLogo} onChange={e => setTempLogo(e.target.value)} className="mt-1 w-full border-gray-300 rounded-md shadow-sm"/>
+                  </div>
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700">Application Subtitle</label>
+                      <input type="text" value={tempSubtitle} onChange={e => setTempSubtitle(e.target.value)} className="mt-1 w-full border-gray-300 rounded-md shadow-sm"/>
+                  </div>
+                  <button onClick={handleCustomizationSave} className="w-full bg-indigo-500 text-white py-2 px-4 rounded-md hover:bg-indigo-600">Save Customization</button>
+              </div>
+          </div>
+          
+          {/* Payment Integrations */}
+          <div className="bg-white p-6 rounded-lg shadow-md">
+              <h3 className="text-xl font-semibold mb-4">Payment Integrations</h3>
+              <div className="space-y-4">
+                  {Object.keys(tempIntegrationSettings).map(key => {
+                      const service = key as keyof IntegrationSettings;
+                      return (
+                          <div key={service} className="p-3 border rounded-md">
+                              <h4 className="font-semibold capitalize">{service}</h4>
+                              <div className="flex items-center mt-2">
+                                  <input type="checkbox" id={`${service}-connected`} checked={tempIntegrationSettings[service].connected} onChange={e => handleIntegrationSettingsChange(service, 'connected', e.target.checked)} className="h-4 w-4 text-brand-primary border-gray-300 rounded"/>
+                                  <label htmlFor={`${service}-connected`} className="ml-2 block text-sm text-gray-900">Connected</label>
+                              </div>
+                              {tempIntegrationSettings[service].connected && (
+                                  <input type="text" placeholder="Identifier (e.g., $cashtag)" value={tempIntegrationSettings[service].identifier} onChange={e => handleIntegrationSettingsChange(service, 'identifier', e.target.value)} className="mt-2 w-full border-gray-300 rounded-md shadow-sm text-sm"/>
+                              )}
+                          </div>
+                      );
+                  })}
+                  <button onClick={saveIntegrationSettings} className="w-full bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600">Save Integrations</button>
+              </div>
+          </div>
+
+
+          {/* Danger Zone */}
+          <div className="bg-white p-6 rounded-lg shadow-md border-2 border-dashed border-danger">
+            <h3 className="text-xl font-semibold mb-4 text-danger">Danger Zone</h3>
+            <button onClick={handleClearTransactions} className="w-full bg-danger text-white py-2 px-4 rounded-md hover:bg-red-700">Delete All Transactions</button>
+          </div>
         </div>
+
       </div>
 
-      <div className="mt-8">
-        <AdminCard title="Manage All Transactions">
-          <div className="sm:flex sm:items-center sm:justify-between mb-4">
-            <input type="text" placeholder="Search by name or description..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full sm:w-auto border-gray-300 rounded-md shadow-sm"/>
-            <button 
-              onClick={handleReconcileClick}
-              className="mt-2 sm:mt-0 w-full sm:w-auto flex items-center justify-center gap-2 py-2 px-4 bg-brand-secondary text-white rounded-md hover:bg-brand-primary"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0_0_20_20" fill="currentColor">
-                <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2l4.45-1.483a1 1 0 011.212 1.212L18.324 11.4l4.938 1.646a1 1 0 01-.434 1.898l-5.457-1.819-2.23 4.46a1 1 0 01-1.789 0l-2.23-4.46-5.457 1.819a1 1 0 01-.434-1.898L7.676 11.4 6.193 6.93a1 1 0 011.212-1.212l4.45 1.483.179-4.457A1 1 0 0112 2z" clipRule="evenodd" />
-              </svg>
-              Reconcile Duplicates
-            </button>
+      {/* Edit Modal */}
+      {isEditModalOpen && editingTransaction && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+            <h3 className="text-xl font-semibold mb-4">Edit Transaction</h3>
+            <div className="space-y-4">
+               <input type="date" value={editingTransaction.date} onChange={e => setEditingTransaction({...editingTransaction, date: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" />
+               <input type="text" value={editingTransaction.classmateName} onChange={e => setEditingTransaction({...editingTransaction, classmateName: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" />
+               <input type="number" step="0.01" value={editingTransaction.amount} onChange={e => setEditingTransaction({...editingTransaction, amount: parseFloat(e.target.value)})} className="w-full border-gray-300 rounded-md shadow-sm" />
+               <textarea value={editingTransaction.description} onChange={e => setEditingTransaction({...editingTransaction, description: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" rows={3}></textarea>
+               <select value={editingTransaction.category} onChange={e => setEditingTransaction({...editingTransaction, category: e.target.value as PaymentCategory})} className="w-full border-gray-300 rounded-md shadow-sm">
+                 {Object.values(PaymentCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+               </select>
+               <select value={editingTransaction.paymentType} onChange={e => setEditingTransaction({...editingTransaction, paymentType: e.target.value as PaymentType})} className="w-full border-gray-300 rounded-md shadow-sm">
+                 {Object.values(PaymentType).map(pt => <option key={pt} value={pt}>{pt}</option>)}
+               </select>
+               <input type="text" placeholder="Transaction ID" value={editingTransaction.transactionId || ''} onChange={e => setEditingTransaction({...editingTransaction, transactionId: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" />
+            </div>
+            <div className="flex justify-end mt-6 space-x-4">
+              <button onClick={closeEditModal} className="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300">Cancel</button>
+              <button onClick={handleUpdateTransaction} className="bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary">Save Changes</button>
+            </div>
           </div>
-          <div className="overflow-x-auto max-h-[500px]">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50 sticky top-0">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Classmate</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Payment Type</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Transaction ID</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredTransactions.map(tx => (
-                  <tr key={tx.id}>
-                    <td className="px-4 py-2 whitespace-nowrap">{new Date(tx.date).toLocaleDateString()}</td>
-                    <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900">{tx.classmateName}</td>
-                    <td className="px-4 py-2 whitespace-nowrap">{tx.category}</td>
-                    <td className="px-4 py-2 whitespace-nowrap text-xs">{tx.paymentType}</td>
-                    <td className="px-4 py-2 whitespace-nowrap text-xs text-gray-500 truncate" title={tx.transactionId}>{tx.transactionId || 'N/A'}</td>
-                    <td className="px-4 py-2 whitespace-nowrap">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(tx.amount)}</td>
-                    <td className="px-4 py-2 whitespace-nowrap space-x-2">
-                      <button onClick={() => setEditingTransaction(tx)} className="text-brand-secondary hover:text-brand-primary font-medium">Edit</button>
-                      <button onClick={() => handleDeleteTx(tx.id)} className="text-danger hover:text-red-700 font-medium">Delete</button>
-                    </td>
-                  </tr>
-                ))}
-                 {filteredTransactions.length === 0 && (
-                  <tr><td colSpan={7} className="text-center py-10 text-gray-500">No matching transactions found.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </AdminCard>
-      </div>
-
-      {editingTransaction && (
-        <EditTransactionModal 
-          transaction={editingTransaction}
-          onClose={() => setEditingTransaction(null)}
-          onSave={(updatedTx) => {
-            updateTransaction(updatedTx);
-            setEditingTransaction(null);
-          }}
-        />
+        </div>
       )}
-      {showReconciliationModal && (
-        <ReconciliationModal
-          duplicateGroups={foundDuplicates}
-          onClose={() => setShowReconciliationModal(false)}
-          onDeleteTransactions={(ids) => {
-            ids.forEach(id => deleteTransaction(id));
-            setShowReconciliationModal(false);
-            alert(`${ids.length} duplicate transaction(s) deleted successfully.`);
-          }}
-        />
+       {/* Reconciliation Modal */}
+      {reconciliationModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 className="text-xl font-semibold">Reconcile Duplicates</h3>
+                <button onClick={() => setReconciliationModalOpen(false)} className="text-gray-500 hover:text-gray-800">&times;</button>
+            </div>
+            {duplicateGroups.length > 0 ? (
+            <>
+            <div className="flex-grow overflow-y-auto pr-2">
+                {duplicateGroups.map((group, index) => (
+                    <div key={index} className="mb-6 p-4 border rounded-md bg-gray-50">
+                        <div className="flex justify-between items-center mb-2">
+                            <h4 className="font-semibold">
+                                Duplicate Set {index + 1}: <span className="font-normal text-gray-600">{group[0].paymentType} / {group[0].transactionId} / {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(group[0].amount)}</span>
+                            </h4>
+                            <button onClick={() => selectForDeletion(group)} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">Keep Oldest, Select Rest</button>
+                        </div>
+                       
+                        <table className="min-w-full text-sm">
+                          <thead className="text-left bg-gray-100">
+                            <tr>
+                              <th className="p-2 w-10">Del</th>
+                              <th className="p-2">Date</th>
+                              <th className="p-2">Name</th>
+                              <th className="p-2">Description</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {group.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(t => (
+                              <tr key={t.id} className="border-t">
+                                <td className="p-2"><input type="checkbox" checked={transactionsToDelete.has(t.id)} onChange={() => toggleTransactionToDelete(t.id)} className="h-4 w-4"/></td>
+                                <td className="p-2">{new Date(t.date).toLocaleDateString()}</td>
+                                <td className="p-2">{t.classmateName}</td>
+                                <td className="p-2 text-gray-600 truncate max-w-xs" title={t.description}>{t.description}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                    </div>
+                ))}
+            </div>
+            <div className="flex justify-end mt-4 pt-4 border-t space-x-4">
+              <p className="text-sm text-gray-600 self-center">{transactionsToDelete.size} transaction(s) selected for deletion.</p>
+              <button onClick={() => setReconciliationModalOpen(false)} className="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300">Cancel</button>
+              <button onClick={handleBulkDelete} disabled={transactionsToDelete.size === 0} className="bg-danger text-white py-2 px-4 rounded-md hover:bg-red-700 disabled:bg-gray-400">Delete Selected</button>
+            </div>
+            </>
+            ) : (
+                <p className="text-center py-10 text-gray-500">No duplicate transactions found.</p>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

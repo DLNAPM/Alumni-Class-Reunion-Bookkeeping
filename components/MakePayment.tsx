@@ -21,7 +21,7 @@ const MakePayment: React.FC = () => {
       category: category,
       amount: parseFloat(amount),
       classmateName: user.name,
-      paymentType: PaymentType.CreditCard,
+      paymentType: PaymentType.Other, // Credit card payments will be categorized as 'Other'
     };
     
     // Simulate API call
