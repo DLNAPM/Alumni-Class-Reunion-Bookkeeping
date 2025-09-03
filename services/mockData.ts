@@ -18,7 +18,7 @@ export const generateMockTransactions = (): Transaction[] => {
     const paymentType = paymentTypes[Math.floor(Math.random() * paymentTypes.length)];
     
     let amount: number;
-    if ([PaymentCategory.Expense, PaymentCategory.BankMaintFee].includes(category)) {
+    if ([PaymentCategory.Expense, PaymentCategory.BankMaintFee, PaymentCategory.Bereavement].includes(category)) {
       amount = -(Math.floor(Math.random() * 150) + 7); // Expenses are negative
     } else if (category === PaymentCategory.Fundraiser) {
       amount = Math.floor(Math.random() * 200) + 20;

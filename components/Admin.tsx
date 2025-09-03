@@ -491,6 +491,7 @@ const Admin: React.FC = () => {
                     </th>
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('date')}>Date {getSortIndicator('date')}</th>
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('classmateName')}>Classmate {getSortIndicator('classmateName')}</th>
+                    <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('description')}>Description {getSortIndicator('description')}</th>
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('category')}>Category {getSortIndicator('category')}</th>
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('paymentType')}>Payment Type {getSortIndicator('paymentType')}</th>
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('transactionId')}>Transaction ID {getSortIndicator('transactionId')}</th>
@@ -511,6 +512,7 @@ const Admin: React.FC = () => {
                       </td>
                       <td className="px-4 py-2 whitespace-nowrap">{new Date(t.date).toLocaleDateString()}</td>
                       <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900">{t.classmateName}</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-gray-600 truncate max-w-xs" title={t.description}>{t.description}</td>
                       <td className="px-4 py-2 whitespace-nowrap">{t.category}</td>
                       <td className="px-4 py-2 whitespace-nowrap text-xs">{t.paymentType}</td>
                       <td className="px-4 py-2 whitespace-nowrap text-gray-500 truncate max-w-xs" title={t.transactionId}>{t.transactionId || ''}</td>
@@ -522,7 +524,7 @@ const Admin: React.FC = () => {
                     </tr>
                   ))}
                    {sortedTransactions.length === 0 && (
-                        <tr><td colSpan={8} className="text-center py-10 text-gray-500">No transactions match your search.</td></tr>
+                        <tr><td colSpan={9} className="text-center py-10 text-gray-500">No transactions match your search.</td></tr>
                     )}
                 </tbody>
               </table>

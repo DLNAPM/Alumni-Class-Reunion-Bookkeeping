@@ -6,6 +6,7 @@ export enum PaymentCategory {
   Fundraiser = 'Fundraiser',
   ClassmateSupport = 'Classmate Support',
   Benevolence = 'Benevolence',
+  Bereavement = 'Bereavement',
   SimpleDeposit = 'Simple-Deposit',
   Picnic = 'Picnic',
   Expense = 'Expense',
