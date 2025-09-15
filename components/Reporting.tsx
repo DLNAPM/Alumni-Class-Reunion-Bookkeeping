@@ -144,7 +144,7 @@ const Reporting: React.FC = () => {
           5. A markdown table of the transaction data provided.
           6. A professional closing.
 
-          Format the output as a JSON object with two keys: "subject" and "body".
+          You must format the output as a JSON object with two keys: "subject" and "body".
 
           Here is the transaction data (JSON format):
           ${JSON.stringify(transactionsForPrompt, null, 2)}
@@ -153,11 +153,13 @@ const Reporting: React.FC = () => {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
+            config: {
+              responseMimeType: "application/json",
+            }
         });
 
         const text = response.text;
-        const jsonString = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
-        const parsedEmail = JSON.parse(jsonString);
+        const parsedEmail = JSON.parse(text);
 
         setGeneratedEmail(parsedEmail);
         setIsEmailModalOpen(true);
