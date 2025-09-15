@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { useData } from '../context/DataContext';
 import { PaymentCategory, Transaction, PaymentType } from '../types';
 
@@ -144,8 +144,6 @@ const Reporting: React.FC = () => {
           5. A markdown table of the transaction data provided.
           6. A professional closing.
 
-          You must format the output as a JSON object with two keys: "subject" and "body".
-
           Here is the transaction data (JSON format):
           ${JSON.stringify(transactionsForPrompt, null, 2)}
         `;
@@ -155,6 +153,14 @@ const Reporting: React.FC = () => {
             contents: prompt,
             config: {
               responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  subject: { type: Type.STRING },
+                  body: { type: Type.STRING },
+                },
+                required: ['subject', 'body'],
+              },
             }
         });
 
