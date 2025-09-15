@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { useData } from '../context/DataContext';
@@ -118,7 +119,14 @@ const Reporting: React.FC = () => {
       setError(null);
       
       try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const apiKey = process.env.API_KEY;
+        if (!apiKey) {
+          setError("Configuration Error: The API_KEY is not set. Please ask the administrator to configure it in the deployment settings.");
+          setIsGeneratingEmail(false);
+          return;
+        }
+        
+        const ai = new GoogleGenAI({ apiKey });
         const transactionsForPrompt = filteredTransactions.slice(0, 50).map(t => ({
           Date: t.date,
           Classmate: t.classmateName,
