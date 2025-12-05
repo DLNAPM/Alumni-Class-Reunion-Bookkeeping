@@ -73,66 +73,70 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <StatCard 
-          title="Class Account Balance" 
-          value={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(classBalance)}
-          icon={<BalanceIcon />}
-        />
-        <StatCard 
-          title="Total Contributions Received" 
-          value={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalContributions)}
-          icon={<DonationIcon />}
-        />
-         <StatCard 
-          title="Total Transactions" 
-          value={transactions.length.toString()}
-          icon={<TransactionsIcon />}
-        />
-      </div>
+      {user?.role !== 'Guest' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <StatCard 
+            title="Class Account Balance" 
+            value={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(classBalance)}
+            icon={<BalanceIcon />}
+          />
+          <StatCard 
+            title="Total Contributions Received" 
+            value={new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalContributions)}
+            icon={<DonationIcon />}
+          />
+           <StatCard 
+            title="Total Transactions" 
+            value={transactions.length.toString()}
+            icon={<TransactionsIcon />}
+          />
+        </div>
+      )}
 
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h3 className="text-xl font-semibold">Yearly Financials by Category</h3>
-        
-        <div className="border-y border-gray-200 my-4 py-4">
-          <h4 className="text-md font-semibold mb-3 text-gray-600">Select categories to compare:</h4>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-4 gap-y-2">
-            {Object.values(PaymentCategory).map(cat => (
-              <label key={cat} className="flex items-center space-x-2 cursor-pointer p-1 rounded-md hover:bg-gray-100 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={selectedCategories.includes(cat)}
-                  onChange={() => handleCategoryChange(cat)}
-                  className="h-4 w-4 text-brand-primary border-gray-300 rounded focus:ring-brand-primary"
-                  style={{ color: categoryColors[cat] }}
-                />
-                <span className="text-sm text-gray-700">{cat}</span>
-              </label>
-            ))}
+      {user?.role !== 'Guest' && (
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h3 className="text-xl font-semibold">Yearly Financials by Category</h3>
+          
+          <div className="border-y border-gray-200 my-4 py-4">
+            <h4 className="text-md font-semibold mb-3 text-gray-600">Select categories to compare:</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-4 gap-y-2">
+              {Object.values(PaymentCategory).map(cat => (
+                <label key={cat} className="flex items-center space-x-2 cursor-pointer p-1 rounded-md hover:bg-gray-100 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.includes(cat)}
+                    onChange={() => handleCategoryChange(cat)}
+                    className="h-4 w-4 text-brand-primary border-gray-300 rounded focus:ring-brand-primary"
+                    style={{ color: categoryColors[cat] }}
+                  />
+                  <span className="text-sm text-gray-700">{cat}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ width: '100%', height: 300 }}>
+            {selectedCategories.length > 0 ? (
+              <ResponsiveContainer>
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="year" />
+                  <YAxis tickFormatter={(value) => `$${value}`} />
+                  <Tooltip formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)} />
+                  <Legend />
+                  {selectedCategories.map(cat => (
+                    <Bar key={cat} dataKey={cat} fill={categoryColors[cat]} name={cat} stackId="a" />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+               <div className="flex items-center justify-center h-full text-gray-500">
+                  <p>Please select one or more categories to display the chart.</p>
+              </div>
+            )}
           </div>
         </div>
-
-        <div style={{ width: '100%', height: 300 }}>
-          {selectedCategories.length > 0 ? (
-            <ResponsiveContainer>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="year" />
-                <YAxis tickFormatter={(value) => `$${value}`} />
-                <Tooltip formatter={(value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)} />
-                <Legend />
-                {selectedCategories.map(cat => (
-                  <Bar key={cat} dataKey={cat} fill={categoryColors[cat]} name={cat} stackId="a" />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-             <div className="flex items-center justify-center h-full text-gray-500">
-                <p>Please select one or more categories to display the chart.</p>
-            </div>
-          )}
-        </div>
-      </div>
+      )}
 
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h3 className="text-xl font-semibold mb-4">Announcements</h3>

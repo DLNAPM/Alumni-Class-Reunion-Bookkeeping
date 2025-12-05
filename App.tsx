@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { DataProvider } from './context/DataContext';
 import Login from './components/Login';
@@ -173,9 +172,39 @@ const App: React.FC = () => {
     return () => authUnsubscribe();
   }, []); // Run only once on mount
 
+  const handleGuestLogin = () => {
+    const guestUser: User = {
+        id: 'guest-user-session',
+        name: 'Guest',
+        email: '',
+        isAdmin: false,
+        role: 'Guest',
+    };
+    const guestSettings: UserSettings = {
+        announcements: [
+             { id: '1', title: 'Upcoming Class Reunion!', content: 'Join us for our 20-year reunion on October 15th! Early bird tickets are now available. A down payment of $50 is required by August 31st to secure your spot. We can\'t wait to see you there!', date: '2024-07-15', type: 'text' },
+             { id: '2', title: 'Welcome!', content: 'You are viewing the portal as a guest. Sign in with Google to access your transaction history and other features.', date: new Date().toISOString().split('T')[0], type: 'text' },
+        ],
+        logo: 'https://picsum.photos/seed/alumni/100/100',
+        subtitle: 'A.E. Beach High C/o 89 Bulldogs',
+        integrationSettings: {
+            cashApp: { connected: false, identifier: '' }, payPal: { connected: false, identifier: '' },
+            zelle: { connected: false, identifier: '' }, bank: { connected: false, identifier: '' },
+        },
+    };
+    setUser(guestUser);
+    setUserSettings(guestSettings);
+    setCurrentPage('dashboard');
+  };
+
   const handleLogout = async () => {
-    // Fix: Use Firebase v8 auth method `signOut`.
-    await auth.signOut();
+    if (user?.role === 'Guest') {
+        setUser(null);
+        setUserSettings(null);
+    } else {
+        // Fix: Use Firebase v8 auth method `signOut`.
+        await auth.signOut();
+    }
   };
   
   const updateUserDoc = useCallback(async (data: Partial<UserSettings & User>) => {
@@ -410,7 +439,7 @@ const App: React.FC = () => {
     switch (currentPage) {
       case 'dashboard': return <Dashboard />;
       case 'payment': return user?.role === 'Admin' ? <MakePayment /> : <Dashboard />;
-      case 'transactions': return <Transactions />;
+      case 'transactions': return user?.role !== 'Guest' ? <Transactions /> : <Dashboard />;
       case 'profile': return user?.role === 'Admin' ? <Profile /> : <Dashboard />;
       case 'admin': return user?.role === 'Admin' ? <Admin /> : <Dashboard />;
       case 'classmates': return user?.role === 'Admin' ? <Classmates /> : <Dashboard />;
@@ -450,8 +479,8 @@ const App: React.FC = () => {
     );
   }
 
-  if (!user || !userSettings) {
-    return <Login />;
+  if (!user) {
+    return <Login onGuestLogin={handleGuestLogin} />;
   }
 
   return (

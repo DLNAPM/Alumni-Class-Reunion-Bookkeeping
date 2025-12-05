@@ -28,7 +28,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, onLogout
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navigation = [
-    { name: 'dashboard', label: 'Dashboard', icon: <DashboardIcon />, roles: ['Admin', 'Standard'] },
+    { name: 'dashboard', label: 'Dashboard', icon: <DashboardIcon />, roles: ['Admin', 'Standard', 'Guest'] },
     { name: 'payment', label: 'Make a Payment', icon: <PaymentIcon />, roles: ['Admin'] },
     { name: 'transactions', label: 'My Transactions', icon: <TransactionsIcon />, roles: ['Admin', 'Standard'] },
     { name: 'profile', label: 'My Profile', icon: <ProfileIcon />, roles: ['Admin'] },

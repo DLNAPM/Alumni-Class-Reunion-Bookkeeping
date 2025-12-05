@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 export enum PaymentCategory {
@@ -46,7 +45,7 @@ export interface Announcement {
   imageUrl?: string;
 }
 
-export type UserRole = 'Admin' | 'Standard';
+export type UserRole = 'Admin' | 'Standard' | 'Guest';
 
 export interface User {
   id: string;

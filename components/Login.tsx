@@ -2,7 +2,11 @@ import React from 'react';
 // Fix: Removed signInWithPopup import as it's a method on the auth object in v8.
 import { auth, googleProvider } from '../firebase';
 
-const Login: React.FC = () => {
+interface LoginProps {
+    onGuestLogin: () => void;
+}
+
+const Login: React.FC<LoginProps> = ({ onGuestLogin }) => {
 
   const handleSignInClick = async () => {
     try {
@@ -34,6 +38,20 @@ const Login: React.FC = () => {
                     <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.904,36.213,44,30.606,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
                 </svg>
                 Sign in with Google
+            </button>
+            <div className="mt-6 relative">
+                <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-white text-gray-500">Or</span>
+                </div>
+            </div>
+            <button
+                onClick={onGuestLogin}
+                className="mt-6 w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                >
+                Continue as a Guest
             </button>
         </div>
     </div>
