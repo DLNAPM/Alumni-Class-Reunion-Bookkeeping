@@ -1,11 +1,13 @@
 import React from 'react';
-import { auth, googleProvider, signInWithPopup } from '../firebase';
+// Fix: Removed signInWithPopup import as it's a method on the auth object in v8.
+import { auth, googleProvider } from '../firebase';
 
 const Login: React.FC = () => {
 
   const handleSignInClick = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      // Fix: Use v8 SDK syntax for signInWithPopup.
+      await auth.signInWithPopup(googleProvider);
       // onAuthStateChanged in App.tsx will handle login and navigation
     } catch (error) {
       console.error("Error signing in with Google:", error);

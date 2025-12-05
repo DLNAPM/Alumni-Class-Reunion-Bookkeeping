@@ -1,21 +1,12 @@
-import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, User as FirebaseUser } from "firebase/auth";
-import { 
-  getFirestore, 
-  collection, 
-  onSnapshot, 
-  doc, 
-  getDoc,
-  setDoc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  writeBatch,
-  query,
-  where,
-  getDocs,
-  Timestamp,
-} from "firebase/firestore";
+// Fix: Use Firebase v9+ compat libraries to match the v12 SDK from importmap and resolve the module export error.
+import firebase from "firebase/compat/app";
+import "firebase/compat/auth";
+import "firebase/compat/firestore";
+
+// The v8 SDK attaches the User type to the firebase namespace.
+// The original `import { User as FirebaseUser } from "firebase/auth"` is v9 syntax.
+type FirebaseUser = firebase.User;
+
 
 // =================================================================================================
 // IMPORTANT: Replace the placeholder configuration below with your app's Firebase project details.
@@ -31,35 +22,21 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 
 // Initialize and export services
-const auth = getAuth(app);
-const db = getFirestore(app);
-const googleProvider = new GoogleAuthProvider();
+const auth = firebase.auth();
+const db = firebase.firestore();
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+const Timestamp = firebase.firestore.Timestamp;
 
 // Export everything needed by the app
 export { 
   auth, 
   db, 
   googleProvider,
-  // Auth
-  signInWithPopup,
-  onAuthStateChanged,
-  signOut,
-  // Firestore
-  collection,
-  onSnapshot,
-  doc,
-  getDoc,
-  setDoc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  writeBatch,
-  query,
-  where,
-  getDocs,
   Timestamp,
 };
 
