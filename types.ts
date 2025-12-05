@@ -45,11 +45,19 @@ export interface Announcement {
   imageUrl?: string;
 }
 
+export type UserRole = 'Admin' | 'Standard';
+
 export interface User {
   id: string;
   name: string;
   email: string;
   isAdmin: boolean;
+  role: UserRole;
+}
+
+export interface Classmate {
+    name: string;
+    role: UserRole;
 }
 
 export interface IntegrationService {
@@ -84,4 +92,6 @@ export interface DataContextType {
   integrationSettings: IntegrationSettings;
   updateIntegrationSettings: (service: keyof IntegrationSettings, settings: IntegrationService) => void;
   updateUserName: (newName: string) => void;
+  classmates: Classmate[];
+  updateClassmateRole: (name: string, role: UserRole) => void;
 }

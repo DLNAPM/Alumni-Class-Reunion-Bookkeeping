@@ -2,21 +2,19 @@ import React, { useState } from 'react';
 import type { User } from '../types';
 
 interface LoginProps {
-  onLogin: (user: User) => void;
+  onLogin: (user: Pick<User, 'id' | 'name' | 'email'>) => void;
 }
 
-const mockUsers: User[] = [
+const mockUsers: Pick<User, 'id' | 'name' | 'email'>[] = [
   {
     id: 'google-101',
     name: 'Alex Johnson',
     email: 'alex.j@example.com',
-    isAdmin: false,
   },
   {
     id: 'google-202',
     name: 'A.E. Beach High C/o 89',
     email: 'dues_beachhigh89@comcast.net',
-    isAdmin: true,
   },
 ];
 
@@ -27,7 +25,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setShowAccountChooser(true);
   };
   
-  const handleAccountSelect = (user: User) => {
+  const handleAccountSelect = (user: Pick<User, 'id' | 'name' | 'email'>) => {
     onLogin(user);
   };
   

@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { DataProvider } from './context/DataContext';
 import Login from './components/Login';
@@ -10,7 +9,8 @@ import Reporting from './components/Reporting';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Profile from './components/Profile';
-import type { User, Transaction, Announcement, IntegrationSettings, IntegrationService } from './types';
+import Classmates from './components/Classmates';
+import type { User, Transaction, Announcement, IntegrationSettings, IntegrationService, Classmate, UserRole } from './types';
 import { generateMockTransactions } from './services/mockData';
 
 
@@ -45,6 +45,18 @@ const App: React.FC = () => {
       return [];
     }
   });
+
+  // GLOBAL state for all classmates and their roles
+  const [classmates, setClassmates] = useState<Classmate[]>(() => {
+    try {
+      const stored = localStorage.getItem('alumniApp-classmates');
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      console.error("Failed to parse classmates from localStorage", e);
+      return [];
+    }
+  });
+
 
   // State for user-specific settings
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
@@ -94,6 +106,32 @@ const App: React.FC = () => {
     }
   }, [transactions]);
 
+  // Save GLOBAL classmates whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('alumniApp-classmates', JSON.stringify(classmates));
+    } catch (e) {
+      console.error("Failed to save classmates to localStorage", e);
+    }
+  }, [classmates]);
+
+  // Sync classmates list with transactions
+  useEffect(() => {
+    const uniqueNames = [...new Set(transactions.map(t => t.classmateName.trim()).filter(Boolean))];
+    setClassmates(prevClassmates => {
+      const existingNames = new Set(prevClassmates.map(c => c.name));
+      const newClassmatesToAdd = uniqueNames
+        .filter(name => !existingNames.has(name))
+        .map(name => ({ name, role: 'Standard' as UserRole }));
+
+      if (newClassmatesToAdd.length > 0) {
+        return [...prevClassmates, ...newClassmatesToAdd].sort((a,b) => a.name.localeCompare(b.name));
+      }
+      return prevClassmates;
+    });
+  }, [transactions]);
+
+
   // Save user-specific settings whenever they change
   useEffect(() => {
     if (user && userSettings) {
@@ -106,8 +144,24 @@ const App: React.FC = () => {
   }, [user, userSettings]);
   
 
-  const handleLogin = (loggedInUser: User) => {
-    setUser(loggedInUser);
+  const handleLogin = (loggedInUser: Pick<User, 'id' | 'name' | 'email'>) => {
+    const foundClassmate = classmates.find(c =>
+        c.name.toLowerCase() === loggedInUser.name.toLowerCase()
+    );
+
+    const role: UserRole = loggedInUser.email === 'dues_beachhigh89@comcast.net'
+        ? 'Admin'
+        : foundClassmate
+        ? foundClassmate.role
+        : 'Standard';
+
+    const finalUser: User = {
+        ...loggedInUser,
+        role,
+        isAdmin: role === 'Admin',
+    };
+
+    setUser(finalUser);
     setCurrentPage('dashboard');
   };
 
@@ -184,6 +238,10 @@ const App: React.FC = () => {
     });
   }, []);
 
+  const updateClassmateRole = useCallback((name: string, role: UserRole) => {
+    setClassmates(prev => prev.map(c => c.name === name ? { ...c, role } : c));
+  }, []);
+
 
   const dataProviderValue = useMemo(() => ({
     user,
@@ -205,22 +263,26 @@ const App: React.FC = () => {
     integrationSettings: userSettings?.integrationSettings || { cashApp: { connected: false, identifier: '' }, payPal: { connected: false, identifier: '' }, zelle: { connected: false, identifier: '' }, bank: { connected: false, identifier: '' } },
     updateIntegrationSettings,
     updateUserName,
-  }), [user, userSettings, transactions, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, addAnnouncement, deleteAnnouncement, setLogo, setSubtitle, updateIntegrationSettings, updateUserName]);
+    classmates: classmates || [],
+    updateClassmateRole,
+  }), [user, userSettings, transactions, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, addAnnouncement, deleteAnnouncement, setLogo, setSubtitle, updateIntegrationSettings, updateUserName, classmates, updateClassmateRole]);
 
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard />;
       case 'payment':
-        return <MakePayment />;
+        return user?.role === 'Admin' ? <MakePayment /> : <Dashboard />;
       case 'transactions':
         return <Transactions />;
       case 'profile':
-        return <Profile />;
+        return user?.role === 'Admin' ? <Profile /> : <Dashboard />;
       case 'admin':
-        return user?.isAdmin ? <Admin /> : <Dashboard />; // Fallback to dashboard if not admin
+        return user?.role === 'Admin' ? <Admin /> : <Dashboard />;
+      case 'classmates':
+        return user?.role === 'Admin' ? <Classmates /> : <Dashboard />;
       case 'reporting':
-        return user?.isAdmin ? <Reporting /> : <Dashboard />; // Fallback to dashboard if not admin
+        return user?.role === 'Admin' ? <Reporting /> : <Dashboard />;
       default:
         return <Dashboard />;
     }
@@ -233,7 +295,7 @@ const App: React.FC = () => {
   return (
     <DataProvider value={dataProviderValue}>
       <div className="flex h-screen bg-brand-background text-brand-text">
-        <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} isAdmin={user.isAdmin} onLogout={handleLogout} />
+        <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} onLogout={handleLogout} />
         <div className="flex-1 flex flex-col overflow-hidden">
           <Header />
           <main className="flex-1 overflow-x-hidden overflow-y-auto bg-brand-background p-4 sm:p-6 lg:p-8">
