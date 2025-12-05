@@ -1,82 +1,84 @@
-
 import React, { useState } from 'react';
+import type { User } from '../types';
 
 interface LoginProps {
-  onLogin: (isAdmin: boolean) => void;
-  subtitle: string;
+  onLogin: (user: User) => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin, subtitle }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+const mockUsers: User[] = [
+  {
+    id: 'google-101',
+    name: 'Alex Johnson',
+    email: 'alex.j@example.com',
+    isAdmin: false,
+  },
+  {
+    id: 'google-202',
+    name: 'A.E. Beach High C/o 89',
+    email: 'dues_beachhigh89@comcast.net',
+    isAdmin: true,
+  },
+];
 
+const Login: React.FC<LoginProps> = ({ onLogin }) => {
+  const [showAccountChooser, setShowAccountChooser] = useState(false);
+
+  const handleSignInClick = () => {
+    setShowAccountChooser(true);
+  };
+  
+  const handleAccountSelect = (user: User) => {
+    onLogin(user);
+  };
+  
   return (
-    <div className="min-h-screen bg-brand-primary flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 space-y-8">
-        <div className="text-center">
-          <svg className="mx-auto h-12 w-auto text-brand-secondary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-          </svg>
-          <h2 className="mt-6 text-3xl font-extrabold text-brand-text">Alumni Bookkeeping</h2>
-          <p className="mt-2 text-md font-medium text-gray-700">{subtitle}</p>
-          <p className="mt-2 text-sm text-gray-600">Welcome back, classmate!</p>
-        </div>
-        <form className="mt-8 space-y-6" onSubmit={(e) => e.preventDefault()}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <input 
-                id="email-address" 
-                name="email" 
-                type="email" 
-                autoComplete="email" 
-                required 
-                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-brand-text rounded-t-md focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary focus:z-10 sm:text-sm" 
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
+    <div className="min-h-screen bg-brand-background flex items-center justify-center p-4">
+        { !showAccountChooser ? (
+            <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-8 text-center">
+                 <svg className="mx-auto h-12 w-auto text-brand-secondary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                </svg>
+                <h2 className="mt-6 text-3xl font-extrabold text-brand-text">Alumni Bookkeeping</h2>
+                <p className="mt-2 text-sm text-gray-600">Welcome! Sign in to continue.</p>
+                <button
+                    onClick={handleSignInClick}
+                    className="mt-8 w-full inline-flex justify-center items-center py-3 px-5 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                    <svg className="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48px" height="48px">
+                        <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
+                        <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
+                        <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.222,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
+                        <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.904,36.213,44,30.606,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
+                    </svg>
+                    Sign in with Google
+                </button>
             </div>
-            <div>
-              <input 
-                id="password" 
-                name="password" 
-                type="password" 
-                autoComplete="current-password" 
-                required 
-                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-brand-text rounded-b-md focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary focus:z-10 sm:text-sm" 
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+        ) : (
+            <div className="w-full max-w-sm bg-white rounded-lg shadow-xl p-6">
+                <div className="text-center border-b pb-4">
+                    <h2 className="text-xl font-semibold text-brand-text">Choose an account</h2>
+                    <p className="text-sm text-gray-500">to continue to Alumni Bookkeeping</p>
+                </div>
+                <ul className="mt-4 space-y-2">
+                    {mockUsers.map(user => (
+                        <li key={user.id}>
+                            <button 
+                                onClick={() => handleAccountSelect(user)}
+                                className="w-full flex items-center p-3 rounded-md hover:bg-gray-100 transition-colors text-left"
+                            >
+                                <div className="w-10 h-10 rounded-full bg-brand-accent flex items-center justify-center text-white font-bold text-lg">
+                                    {user.name.charAt(0)}
+                                </div>
+                                <div className="ml-4">
+                                    <p className="font-semibold text-brand-text">{user.name}</p>
+                                    <p className="text-sm text-gray-500">{user.email}</p>
+                                </div>
+                            </button>
+                        </li>
+                    ))}
+                </ul>
             </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="text-sm">
-              <a href="#" className="font-medium text-brand-secondary hover:text-brand-primary">
-                Forgot your password?
-              </a>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <button
-              type="submit"
-              onClick={() => onLogin(false)}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-brand-secondary hover:bg-brand-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition duration-150 ease-in-out"
-            >
-              Sign in as Classmate
-            </button>
-            <button
-              type="submit"
-              onClick={() => onLogin(true)}
-              className="group relative w-full flex justify-center py-3 px-4 border border-brand-accent text-sm font-medium rounded-md text-brand-secondary bg-white hover:bg-brand-accent hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-secondary transition duration-150 ease-in-out"
-            >
-              Sign in as Administrator
-            </button>
-          </div>
-        </form>
-      </div>
+        )}
     </div>
   );
 };

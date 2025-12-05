@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { DataProvider } from './context/DataContext';
 import Login from './components/Login';
@@ -12,49 +13,79 @@ import Profile from './components/Profile';
 import type { User, Transaction, Announcement, IntegrationSettings, IntegrationService } from './types';
 import { generateMockTransactions } from './services/mockData';
 
+
+// User-specific settings, excluding transactions
+interface UserSettings {
+  announcements: Announcement[];
+  logo: string;
+  subtitle: string;
+  integrationSettings: IntegrationSettings;
+}
+
 const App: React.FC = () => {
+  // State for the currently logged-in user
   const [user, setUser] = useState<User | null>(() => {
     try {
-      const storedUser = localStorage.getItem('alumniApp-user');
+      const storedUser = localStorage.getItem('alumniApp-currentUser');
       return storedUser ? JSON.parse(storedUser) : null;
     } catch (e) {
       console.error("Failed to parse user from localStorage", e);
       return null;
     }
   });
-  useEffect(() => {
-    try {
-      if (user) {
-        localStorage.setItem('alumniApp-user', JSON.stringify(user));
-      } else {
-        localStorage.removeItem('alumniApp-user');
-      }
-    } catch (e) {
-      console.error("Failed to save user to localStorage", e);
-    }
-  }, [user]);
 
-  const [logo, setLogo] = useState<string>(() => localStorage.getItem('alumniApp-logo') || 'https://picsum.photos/seed/alumni/100/100');
-  useEffect(() => localStorage.setItem('alumniApp-logo', logo), [logo]);
-
-  const [subtitle, setSubtitle] = useState<string>(() => localStorage.getItem('alumniApp-subtitle') || 'A.E. Beach High C/o 89 Bulldogs');
-  useEffect(() => localStorage.setItem('alumniApp-subtitle', subtitle), [subtitle]);
-
-  const [currentPage, setCurrentPage] = useState('dashboard');
-
+  // GLOBAL state for all transactions
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     try {
       const storedTransactions = localStorage.getItem('alumniApp-transactions');
-      // Load mock data only if there's nothing in storage
-      if (storedTransactions === null) {
-          return generateMockTransactions();
-      }
-      return JSON.parse(storedTransactions);
+      // If no global transactions, initialize with mock data.
+      return storedTransactions ? JSON.parse(storedTransactions) : generateMockTransactions();
     } catch (e) {
       console.error("Failed to parse transactions from localStorage", e);
-      return generateMockTransactions();
+      return [];
     }
   });
+
+  // State for user-specific settings
+  const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
+  const [currentPage, setCurrentPage] = useState('dashboard');
+
+  // Load user settings when user logs in or on initial load
+  useEffect(() => {
+    if (user) {
+      try {
+        const storedSettings = localStorage.getItem(`alumniApp-settings-${user.email}`);
+        if (storedSettings) {
+          setUserSettings(JSON.parse(storedSettings));
+        } else {
+          // Initialize with default/mock settings for a new user
+          const defaultSettings: UserSettings = {
+            announcements: [
+              { id: 1, title: 'Upcoming Class Reunion!', content: 'Join us for our 20-year reunion on October 15th! Early bird tickets are now available. A down payment of $50 is required by August 31st to secure your spot. We can\'t wait to see you there!', date: '2024-07-15', type: 'text' },
+              { id: 2, title: 'Class Fundraiser for John Doe', content: 'We are raising funds to support our classmate John Doe during a difficult time. Any donation, big or small, is greatly appreciated.', date: '2024-06-20', type: 'text' },
+            ],
+            logo: 'https://picsum.photos/seed/alumni/100/100',
+            subtitle: 'A.E. Beach High C/o 89 Bulldogs',
+            integrationSettings: {
+              cashApp: { connected: false, identifier: '' },
+              payPal: { connected: false, identifier: '' },
+              zelle: { connected: false, identifier: '' },
+              bank: { connected: false, identifier: '' },
+            },
+          };
+          setUserSettings(defaultSettings);
+        }
+        localStorage.setItem('alumniApp-currentUser', JSON.stringify(user));
+      } catch (e) {
+        console.error("Failed to load user settings from localStorage", e);
+      }
+    } else {
+      localStorage.removeItem('alumniApp-currentUser');
+      setUserSettings(null); // Clear settings on logout
+    }
+  }, [user]);
+
+  // Save GLOBAL transactions whenever they change
   useEffect(() => {
     try {
       localStorage.setItem('alumniApp-transactions', JSON.stringify(transactions));
@@ -63,67 +94,20 @@ const App: React.FC = () => {
     }
   }, [transactions]);
 
-  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
-    try {
-      const stored = localStorage.getItem('alumniApp-announcements');
-      return stored ? JSON.parse(stored) : [
-        {
-          id: 1,
-          title: 'Upcoming Class Reunion!',
-          content: 'Join us for our 20-year reunion on October 15th! Early bird tickets are now available. A down payment of $50 is required by August 31st to secure your spot. We can\'t wait to see you there!',
-          date: '2024-07-15',
-          type: 'text'
-        },
-        {
-          id: 2,
-          title: 'Class Fundraiser for John Doe',
-          content: 'We are raising funds to support our classmate John Doe during a difficult time. Any donation, big or small, is greatly appreciated.',
-          date: '2024-06-20',
-          type: 'text'
-        },
-      ];
-    } catch (e) {
-      console.error("Failed to parse announcements from localStorage", e);
-      return []; // Return empty on error
-    }
-  });
+  // Save user-specific settings whenever they change
   useEffect(() => {
-    try {
-      localStorage.setItem('alumniApp-announcements', JSON.stringify(announcements));
-    } catch (e) {
-      console.error("Failed to save announcements to localStorage", e);
+    if (user && userSettings) {
+      try {
+        localStorage.setItem(`alumniApp-settings-${user.email}`, JSON.stringify(userSettings));
+      } catch (e) {
+        console.error("Failed to save user settings to localStorage", e);
+      }
     }
-  }, [announcements]);
+  }, [user, userSettings]);
   
-  const [integrationSettings, setIntegrationSettings] = useState<IntegrationSettings>(() => {
-    try {
-      const stored = localStorage.getItem('alumniApp-integrationSettings');
-      return stored ? JSON.parse(stored) : {
-        cashApp: { connected: false, identifier: '' },
-        payPal: { connected: false, identifier: '' },
-        zelle: { connected: false, identifier: '' },
-        bank: { connected: false, identifier: '' },
-      };
-    } catch (e) {
-      console.error("Failed to parse integrationSettings from localStorage", e);
-      return { cashApp: { connected: false, identifier: '' }, payPal: { connected: false, identifier: '' }, zelle: { connected: false, identifier: '' }, bank: { connected: false, identifier: '' } };
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem('alumniApp-integrationSettings', JSON.stringify(integrationSettings));
-    } catch (e) {
-      console.error("Failed to save integrationSettings to localStorage", e);
-    }
-  }, [integrationSettings]);
 
-  const handleLogin = (isAdmin: boolean) => {
-    setUser({
-      id: '123',
-      name: 'Alex Johnson',
-      email: 'alex.j@example.com',
-      isAdmin,
-    });
+  const handleLogin = (loggedInUser: User) => {
+    setUser(loggedInUser);
     setCurrentPage('dashboard');
   };
 
@@ -131,12 +115,26 @@ const App: React.FC = () => {
     setUser(null);
   };
   
+  const setLogo = useCallback((logo: string | ((prevLogo: string) => string)) => {
+    setUserSettings(prev => prev ? { ...prev, logo: typeof logo === 'function' ? logo(prev.logo) : logo } : null);
+  }, []);
+
+  const setSubtitle = useCallback((subtitle: string | ((prevSubtitle: string) => string)) => {
+    setUserSettings(prev => prev ? { ...prev, subtitle: typeof subtitle === 'function' ? subtitle(prev.subtitle) : subtitle } : null);
+  }, []);
+
   const updateIntegrationSettings = useCallback((service: keyof IntegrationSettings, settings: IntegrationService) => {
-    setIntegrationSettings(prev => ({ ...prev, [service]: settings }));
+    setUserSettings(prev => {
+      if (!prev) return null;
+      return { ...prev, integrationSettings: { ...prev.integrationSettings, [service]: settings }};
+    });
   }, []);
 
   const addTransaction = useCallback((transaction: Omit<Transaction, 'id'>) => {
-    setTransactions(prev => [{ ...transaction, id: Date.now() + Math.random() }, ...prev]);
+    setTransactions(prev => {
+      const newTransaction = { ...transaction, id: Date.now() + Math.random() };
+      return [newTransaction, ...prev];
+    });
   }, []);
   
   const updateTransaction = useCallback((updatedTransaction: Transaction) => {
@@ -144,8 +142,10 @@ const App: React.FC = () => {
   }, []);
 
   const updateTransactions = useCallback((transactionsToUpdate: Transaction[]) => {
-    const updatesMap = new Map(transactionsToUpdate.map(t => [t.id, t]));
-    setTransactions(prev => prev.map(t => updatesMap.get(t.id) || t));
+    setTransactions(prev => {
+        const updatesMap = new Map(transactionsToUpdate.map(t => [t.id, t]));
+        return prev.map(t => updatesMap.get(t.id) || t);
+    });
   }, []);
 
   const deleteTransaction = useCallback((transactionId: number) => {
@@ -153,8 +153,10 @@ const App: React.FC = () => {
   }, []);
 
   const deleteTransactions = useCallback((transactionIds: number[]) => {
-    const idsToDelete = new Set(transactionIds);
-    setTransactions(prev => prev.filter(t => !idsToDelete.has(t.id)));
+    setTransactions(prev => {
+      const idsToDelete = new Set(transactionIds);
+      return prev.filter(t => !idsToDelete.has(t.id));
+    });
   }, []);
   
   const clearTransactions = useCallback(() => {
@@ -162,11 +164,15 @@ const App: React.FC = () => {
   }, []);
 
   const addAnnouncement = useCallback((announcement: Omit<Announcement, 'id'>) => {
-    setAnnouncements(prev => [{ ...announcement, id: Date.now() }, ...prev]);
+    setUserSettings(prev => {
+        if (!prev) return null;
+        const newAnnouncement = { ...announcement, id: Date.now() };
+        return { ...prev, announcements: [newAnnouncement, ...prev.announcements] };
+    });
   }, []);
 
   const deleteAnnouncement = useCallback((announcementId: number) => {
-    setAnnouncements(prev => prev.filter(a => a.id !== announcementId));
+    setUserSettings(prev => prev ? { ...prev, announcements: prev.announcements.filter(a => a.id !== announcementId) } : null);
   }, []);
 
   const updateUserName = useCallback((newName: string) => {
@@ -181,25 +187,25 @@ const App: React.FC = () => {
 
   const dataProviderValue = useMemo(() => ({
     user,
-    logo,
+    logo: userSettings?.logo || '',
     setLogo,
-    subtitle,
+    subtitle: userSettings?.subtitle || '',
     setSubtitle,
-    transactions,
+    transactions: transactions || [],
     addTransaction,
     updateTransaction,
     updateTransactions,
     deleteTransaction,
     deleteTransactions,
     clearTransactions,
-    announcements,
+    announcements: userSettings?.announcements || [],
     addAnnouncement,
     deleteAnnouncement,
-    classBalance: transactions.reduce((acc, t) => acc + t.amount, 0),
-    integrationSettings,
+    classBalance: transactions.reduce((acc, t) => acc + t.amount, 0) || 0,
+    integrationSettings: userSettings?.integrationSettings || { cashApp: { connected: false, identifier: '' }, payPal: { connected: false, identifier: '' }, zelle: { connected: false, identifier: '' }, bank: { connected: false, identifier: '' } },
     updateIntegrationSettings,
     updateUserName,
-  }), [user, logo, subtitle, transactions, announcements, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, addAnnouncement, deleteAnnouncement, integrationSettings, updateIntegrationSettings, updateUserName]);
+  }), [user, userSettings, transactions, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, addAnnouncement, deleteAnnouncement, setLogo, setSubtitle, updateIntegrationSettings, updateUserName]);
 
   const renderPage = () => {
     switch (currentPage) {
@@ -220,8 +226,8 @@ const App: React.FC = () => {
     }
   };
 
-  if (!user) {
-    return <Login onLogin={handleLogin} subtitle={subtitle} />;
+  if (!user || !userSettings) {
+    return <Login onLogin={handleLogin} />;
   }
 
   return (

@@ -33,12 +33,12 @@ const Reporting: React.FC = () => {
   };
 
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value as PaymentCategory);
+    const selectedOptions = Array.from(e.target.selectedOptions, (option: HTMLOptionElement) => option.value as PaymentCategory);
     setFilters(prev => ({ ...prev, categories: selectedOptions }));
   };
   
   const handlePaymentTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value as PaymentType);
+    const selectedOptions = Array.from(e.target.selectedOptions, (option: HTMLOptionElement) => option.value as PaymentType);
     setFilters(prev => ({ ...prev, paymentTypes: selectedOptions }));
   };
 
@@ -173,6 +173,9 @@ const Reporting: React.FC = () => {
         });
 
         const text = response.text;
+        if (!text) {
+          throw new Error("Failed to generate email content. The model returned an empty response.");
+        }
         const parsedEmail = JSON.parse(text);
 
         setGeneratedEmail(parsedEmail);
