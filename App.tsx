@@ -352,6 +352,46 @@ const App: React.FC = () => {
     await batch.commit();
   }, []);
 
+  const reconcileDuplicateClassmates = useCallback(async () => {
+    const classmatesByName = new Map<string, Classmate[]>();
+    classmates.forEach(c => {
+      const name = c.name.trim().toLowerCase();
+      if (!classmatesByName.has(name)) {
+        classmatesByName.set(name, []);
+      }
+      classmatesByName.get(name)!.push(c);
+    });
+
+    const duplicateGroups = Array.from(classmatesByName.values()).filter(group => group.length > 1);
+
+    if (duplicateGroups.length === 0) {
+      alert("No duplicate classmates found to reconcile.");
+      return;
+    }
+
+    let mergedCount = 0;
+    for (const group of duplicateGroups) {
+      // Find the best profile to keep (Admin > has email > first one)
+      const sortedGroup = [...group].sort((a, b) => {
+        if (a.role === 'Admin' && b.role !== 'Admin') return -1;
+        if (b.role === 'Admin' && a.role !== 'Admin') return 1;
+        if (a.email && !b.email) return -1;
+        if (b.email && !a.email) return 1;
+        return 0;
+      });
+      
+      const target = sortedGroup[0];
+      const sources = sortedGroup.slice(1);
+      
+      if (sources.length > 0) {
+        await mergeClassmates(target.id, sources.map(s => s.id));
+        mergedCount += sources.length;
+      }
+    }
+    
+    alert(`Reconciliation complete. Merged ${mergedCount} duplicate profiles.`);
+  }, [classmates, mergeClassmates]);
+
   const dataProviderValue = useMemo(() => ({
     user,
     logo: userSettings?.logo || '', setLogo,
@@ -363,7 +403,8 @@ const App: React.FC = () => {
     updateIntegrationSettings,
     updateUserName,
     classmates, updateClassmate, mergeClassmates, deleteClassmates, updateClassmatesStatus,
-  }), [user, userSettings, transactions, classmates, setLogo, setSubtitle, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, addAnnouncement, deleteAnnouncement, updateIntegrationSettings, updateUserName, updateClassmate, mergeClassmates, deleteClassmates, updateClassmatesStatus]);
+    reconcileDuplicateClassmates,
+  }), [user, userSettings, transactions, classmates, setLogo, setSubtitle, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, addAnnouncement, deleteAnnouncement, updateIntegrationSettings, updateUserName, updateClassmate, mergeClassmates, deleteClassmates, updateClassmatesStatus, reconcileDuplicateClassmates]);
 
   const renderPage = () => {
     switch (currentPage) {

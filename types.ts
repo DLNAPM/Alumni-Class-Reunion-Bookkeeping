@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export enum PaymentCategory {
@@ -102,4 +103,5 @@ export interface DataContextType {
   mergeClassmates: (targetClassmateId: string, sourceClassmateIds: string[]) => Promise<void>;
   deleteClassmates: (classmateIds: string[]) => Promise<string | null>; // Returns error message or null
   updateClassmatesStatus: (classmateIds: string[], status: 'Active' | 'Inactive') => Promise<void>;
+  reconcileDuplicateClassmates: () => Promise<void>;
 }

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { Classmate } from '../types';
@@ -120,7 +121,7 @@ const MergeClassmatesModal: React.FC<{
 
 
 const Classmates: React.FC = () => {
-    const { classmates, updateClassmate, mergeClassmates, deleteClassmates, updateClassmatesStatus } = useData();
+    const { classmates, updateClassmate, mergeClassmates, deleteClassmates, updateClassmatesStatus, reconcileDuplicateClassmates } = useData();
     const [editingClassmate, setEditingClassmate] = useState<Classmate | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
@@ -184,6 +185,15 @@ const Classmates: React.FC = () => {
         setIsMergeModalOpen(true);
     };
 
+    const handleReconcile = () => {
+      if (window.confirm(`Are you sure you want to automatically find and merge all duplicate classmate profiles? This action will merge profiles with the exact same name and cannot be undone.`)) {
+        reconcileDuplicateClassmates();
+        setSelectedIds(new Set());
+      }
+    }
+
+    const allSelected = sortedClassmates.length > 0 && selectedIds.size === sortedClassmates.length;
+
     return (
         <>
             <div className="bg-white p-6 sm:p-8 rounded-lg shadow-md">
@@ -193,10 +203,13 @@ const Classmates: React.FC = () => {
                   <div className="bg-brand-secondary text-white p-3 rounded-lg shadow-md mb-4 flex items-center justify-between sticky top-0 z-10">
                     <span className="font-semibold">{selectedIds.size} classmate(s) selected</span>
                     <div className="flex flex-wrap gap-2 items-center">
+                      {allSelected && (
+                        <button onClick={handleReconcile} className="bg-indigo-500 hover:bg-indigo-600 px-3 py-1 rounded-md text-sm font-medium">Reconcile All</button>
+                      )}
                       <button onClick={() => handleStatusUpdate('Active')} className="bg-success hover:bg-green-600 px-3 py-1 rounded-md text-sm font-medium">Activate</button>
                       <button onClick={() => handleStatusUpdate('Inactive')} className="bg-warning hover:bg-yellow-600 px-3 py-1 rounded-md text-sm font-medium text-white">De-activate</button>
-                      <button onClick={handleMerge} disabled={selectedIds.size < 2} className="bg-brand-accent hover:bg-blue-400 px-3 py-1 rounded-md text-sm font-medium text-white disabled:bg-gray-400 disabled:cursor-not-allowed">Merge</button>
-                      <button onClick={handleDelete} className="bg-danger hover:bg-red-700 px-3 py-1 rounded-md text-sm font-medium">Delete</button>
+                      <button onClick={handleMerge} disabled={selectedIds.size < 2} className="bg-brand-accent hover:bg-blue-400 px-3 py-1 rounded-md text-sm font-medium text-white disabled:bg-gray-400 disabled:cursor-not-allowed">Merge Selected</button>
+                      <button onClick={handleDelete} className="bg-danger hover:bg-red-700 px-3 py-1 rounded-md text-sm font-medium">Delete Selected</button>
                     </div>
                   </div>
                 )}
@@ -211,7 +224,7 @@ const Classmates: React.FC = () => {
                                       type="checkbox"
                                       className="h-4 w-4 text-brand-primary border-gray-300 rounded focus:ring-brand-primary"
                                       onChange={handleSelectAll}
-                                      checked={sortedClassmates.length > 0 && selectedIds.size === sortedClassmates.length}
+                                      checked={allSelected}
                                   />
                                 </th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Classmate Name</th>
