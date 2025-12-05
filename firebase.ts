@@ -22,12 +22,12 @@ import {
 // You can find this in your Firebase project settings.
 // =================================================================================================
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyC6YqwocJZqxa98SZsJpK1dGeCOcUKknhM",
+  authDomain: "alumni-bookkeeping-app.firebaseapp.com",
+  projectId: "alumni-bookkeeping-app",
+  storageBucket: "alumni-bookkeeping-app.firebasestorage.app",
+  messagingSenderId: "485182693022",
+  appId: "1:485182693022:web:0b32398f891aa797fa658f"
 };
 
 // Initialize Firebase
