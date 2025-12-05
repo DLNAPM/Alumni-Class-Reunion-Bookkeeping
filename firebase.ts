@@ -9,8 +9,9 @@ type FirebaseUser = firebase.User;
 
 
 // =================================================================================================
-// IMPORTANT: Replace the placeholder configuration below with your app's Firebase project details.
-// You can find this in your Firebase project settings.
+// Firebase Configuration
+// =================================================================================================
+// The API key below was provided by the user. It has been wrapped in quotes to fix the ReferenceError.
 // =================================================================================================
 const firebaseConfig = {
   apiKey: "AIzaSyC6YqwocJZqxa98SZsJpK1dGeCOcUKknhM",
@@ -33,9 +34,9 @@ const googleProvider = new firebase.auth.GoogleAuthProvider();
 const Timestamp = firebase.firestore.Timestamp;
 
 // Export everything needed by the app
-export { 
-  auth, 
-  db, 
+export {
+  auth,
+  db,
   googleProvider,
   Timestamp,
 };
