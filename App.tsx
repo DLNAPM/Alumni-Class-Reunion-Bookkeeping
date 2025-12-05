@@ -62,24 +62,29 @@ const App: React.FC = () => {
             let finalName = firebaseUser.displayName || 'New User';
             let finalIsAdmin = isAdminByEmail;
 
-            if (!isAdminByEmail) {
-            // Fix: Use Firebase v8 Firestore query syntax.
-            const classmatesQuery = db.collection('classmates').where('email', '==', firebaseUser.email);
-            // Fix: Use Firebase v8 Firestore method `get()` on query.
-            const querySnapshot = await classmatesQuery.get();
-            if (!querySnapshot.empty) {
-                const classmateData = querySnapshot.docs[0].data() as Classmate;
-                if (classmateData.status === 'Inactive') {
-                    alert("Your account is currently inactive. Please contact the administrator.");
-                    // Fix: Use Firebase v8 auth method `signOut`.
-                    await auth.signOut();
-                    setLoading(false);
-                    return;
+            // Fix: Explicitly set the role for the primary admin to ensure correct permissions.
+            if (isAdminByEmail) {
+                finalRole = 'Admin';
+            } else {
+                // For other users, check the classmates collection for their role
+                // Fix: Use Firebase v8 Firestore query syntax.
+                const classmatesQuery = db.collection('classmates').where('email', '==', firebaseUser.email);
+                // Fix: Use Firebase v8 Firestore method `get()` on query.
+                const querySnapshot = await classmatesQuery.get();
+                if (!querySnapshot.empty) {
+                    const classmateData = querySnapshot.docs[0].data() as Classmate;
+                    if (classmateData.status === 'Inactive') {
+                        alert("Your account is currently inactive. Please contact the administrator.");
+                        // Fix: Use Firebase v8 auth method `signOut`.
+                        await auth.signOut();
+                        setLoading(false);
+                        return;
+                    }
+                    finalRole = classmateData.role;
+                    finalName = classmateData.name;
+                    // Also allow for other users to be designated as Admins from the Classmates panel
+                    finalIsAdmin = classmateData.role === 'Admin';
                 }
-                finalRole = classmateData.role;
-                finalName = classmateData.name;
-                finalIsAdmin = classmateData.role === 'Admin';
-            }
             }
             
             // If user document doesn't exist in Firestore, create it
