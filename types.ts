@@ -25,7 +25,7 @@ export enum PaymentType {
 }
 
 export interface Transaction {
-  id: number;
+  id: string;
   date: string;
   description: string;
   category: PaymentCategory;
@@ -36,7 +36,7 @@ export interface Transaction {
 }
 
 export interface Announcement {
-  id: number;
+  id: string;
   title: string;
   content: string;
   date: string;
@@ -56,6 +56,7 @@ export interface User {
 }
 
 export interface Classmate {
+    id: string;
     name: string;
     role: UserRole;
     email?: string;
@@ -79,26 +80,26 @@ export interface IntegrationSettings {
 export interface DataContextType {
   user: User | null;
   logo: string;
-  setLogo: React.Dispatch<React.SetStateAction<string>>;
+  setLogo: (logoUpdater: string | ((prevLogo: string) => string)) => Promise<void>;
   subtitle: string;
-  setSubtitle: React.Dispatch<React.SetStateAction<string>>;
+  setSubtitle: (subtitleUpdater: string | ((prevSubtitle: string) => string)) => Promise<void>;
   transactions: Transaction[];
-  addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
-  updateTransaction: (updatedTransaction: Transaction) => void;
-  updateTransactions: (updatedTransactions: Transaction[]) => void;
-  deleteTransaction: (transactionId: number) => void;
-  deleteTransactions: (transactionIds: number[]) => void;
-  clearTransactions: () => void;
+  addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<void>;
+  updateTransaction: (updatedTransaction: Transaction) => Promise<void>;
+  updateTransactions: (updatedTransactions: Transaction[]) => Promise<void>;
+  deleteTransaction: (transactionId: string) => Promise<void>;
+  deleteTransactions: (transactionIds: string[]) => Promise<void>;
+  clearTransactions: () => Promise<void>;
   announcements: Announcement[];
-  addAnnouncement: (announcement: Omit<Announcement, 'id'>) => void;
-  deleteAnnouncement: (announcementId: number) => void;
+  addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date'>) => Promise<void>;
+  deleteAnnouncement: (announcementId: string) => Promise<void>;
   classBalance: number;
   integrationSettings: IntegrationSettings;
-  updateIntegrationSettings: (service: keyof IntegrationSettings, settings: IntegrationService) => void;
-  updateUserName: (newName: string) => void;
+  updateIntegrationSettings: (service: keyof IntegrationSettings, settings: IntegrationService) => Promise<void>;
+  updateUserName: (newName: string) => Promise<void>;
   classmates: Classmate[];
-  updateClassmate: (name: string, updatedData: Partial<Classmate>) => void;
-  mergeClassmates: (targetClassmateName: string, sourceClassmateNames: string[]) => void;
-  deleteClassmates: (classmateNames: string[]) => string | null; // Returns error message or null
-  updateClassmatesStatus: (classmateNames: string[], status: 'Active' | 'Inactive') => void;
+  updateClassmate: (id: string, updatedData: Partial<Omit<Classmate, 'id'>>) => Promise<void>;
+  mergeClassmates: (targetClassmateId: string, sourceClassmateIds: string[]) => Promise<void>;
+  deleteClassmates: (classmateIds: string[]) => Promise<string | null>; // Returns error message or null
+  updateClassmatesStatus: (classmateIds: string[], status: 'Active' | 'Inactive') => Promise<void>;
 }

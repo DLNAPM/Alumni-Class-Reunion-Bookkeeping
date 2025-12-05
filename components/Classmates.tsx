@@ -4,12 +4,12 @@ import { Classmate } from '../types';
 
 interface EditModalProps {
     classmate: Classmate;
-    onSave: (name: string, updatedData: Partial<Classmate>) => void;
+    onSave: (id: string, updatedData: Partial<Omit<Classmate, 'id'>>) => void;
     onClose: () => void;
 }
 
 const EditClassmateModal: React.FC<EditModalProps> = ({ classmate, onSave, onClose }) => {
-    const [formData, setFormData] = useState(classmate);
+    const [formData, setFormData] = useState<Omit<Classmate, 'id'>>(classmate);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -18,7 +18,7 @@ const EditClassmateModal: React.FC<EditModalProps> = ({ classmate, onSave, onClo
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(classmate.name, formData);
+        onSave(classmate.id, formData);
         onClose();
     };
 
@@ -73,19 +73,19 @@ const EditClassmateModal: React.FC<EditModalProps> = ({ classmate, onSave, onClo
 };
 
 const MergeClassmatesModal: React.FC<{
-    selectedNames: string[];
-    onMerge: (targetName: string, sourceNames: string[]) => void;
+    selectedClassmates: Classmate[];
+    onMerge: (targetId: string, sourceIds: string[]) => void;
     onClose: () => void;
-}> = ({ selectedNames, onMerge, onClose }) => {
-    const [targetName, setTargetName] = useState<string>(selectedNames[0] || '');
+}> = ({ selectedClassmates, onMerge, onClose }) => {
+    const [targetId, setTargetId] = useState<string>(selectedClassmates[0]?.id || '');
 
     const handleMerge = () => {
-        if (!targetName) {
+        if (!targetId) {
             alert("Please select a primary profile to merge into.");
             return;
         }
-        const sourceNames = selectedNames.filter(name => name !== targetName);
-        onMerge(targetName, sourceNames);
+        const sourceIds = selectedClassmates.map(c => c.id).filter(id => id !== targetId);
+        onMerge(targetId, sourceIds);
         onClose();
     };
 
@@ -95,17 +95,17 @@ const MergeClassmatesModal: React.FC<{
                 <h3 className="text-xl font-semibold text-brand-text mb-4">Merge Classmate Profiles</h3>
                 <p className="text-sm text-gray-600 mb-6">Select the primary profile to keep. All transactions from the other selected profiles will be reassigned to this primary profile, and the other profiles will be deleted. This action cannot be undone.</p>
                 <div className="space-y-3">
-                    {selectedNames.map(name => (
-                        <label key={name} className="flex items-center p-3 border rounded-md cursor-pointer hover:bg-gray-50">
+                    {selectedClassmates.map(c => (
+                        <label key={c.id} className="flex items-center p-3 border rounded-md cursor-pointer hover:bg-gray-50">
                             <input
                                 type="radio"
                                 name="targetClassmate"
-                                value={name}
-                                checked={targetName === name}
-                                onChange={() => setTargetName(name)}
+                                value={c.id}
+                                checked={targetId === c.id}
+                                onChange={() => setTargetId(c.id)}
                                 className="h-4 w-4 text-brand-primary border-gray-300 focus:ring-brand-primary"
                             />
-                            <span className="ml-3 font-medium text-gray-800">{name}</span>
+                            <span className="ml-3 font-medium text-gray-800">{c.name}</span>
                         </label>
                     ))}
                 </div>
@@ -122,7 +122,7 @@ const MergeClassmatesModal: React.FC<{
 const Classmates: React.FC = () => {
     const { classmates, updateClassmate, mergeClassmates, deleteClassmates, updateClassmatesStatus } = useData();
     const [editingClassmate, setEditingClassmate] = useState<Classmate | null>(null);
-    const [selectedClassmates, setSelectedClassmates] = useState<Set<string>>(new Set());
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
     
     const selectAllRef = useRef<HTMLInputElement>(null);
@@ -134,50 +134,50 @@ const Classmates: React.FC = () => {
 
     useEffect(() => {
         if (selectAllRef.current) {
-          const isIndeterminate = selectedClassmates.size > 0 && selectedClassmates.size < sortedClassmates.length;
+          const isIndeterminate = selectedIds.size > 0 && selectedIds.size < sortedClassmates.length;
           selectAllRef.current.indeterminate = isIndeterminate;
         }
-    }, [selectedClassmates, sortedClassmates.length]);
+    }, [selectedIds, sortedClassmates.length]);
 
 
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.checked) {
-            setSelectedClassmates(new Set(sortedClassmates.map(c => c.name)));
+            setSelectedIds(new Set(sortedClassmates.map(c => c.id)));
         } else {
-            setSelectedClassmates(new Set());
+            setSelectedIds(new Set());
         }
     };
 
-    const handleSelectOne = (name: string) => {
-        setSelectedClassmates(prev => {
+    const handleSelectOne = (id: string) => {
+        setSelectedIds(prev => {
             const newSet = new Set(prev);
-            if (newSet.has(name)) {
-                newSet.delete(name);
+            if (newSet.has(id)) {
+                newSet.delete(id);
             } else {
-                newSet.add(name);
+                newSet.add(id);
             }
             return newSet;
         });
     };
 
     const handleStatusUpdate = (status: 'Active' | 'Inactive') => {
-        updateClassmatesStatus(Array.from(selectedClassmates), status);
-        setSelectedClassmates(new Set());
+        updateClassmatesStatus(Array.from(selectedIds), status);
+        setSelectedIds(new Set());
     };
 
-    const handleDelete = () => {
-        if (window.confirm(`Are you sure you want to delete ${selectedClassmates.size} selected classmate profile(s)? This action cannot be undone.`)) {
-            const error = deleteClassmates(Array.from(selectedClassmates));
+    const handleDelete = async () => {
+        if (window.confirm(`Are you sure you want to delete ${selectedIds.size} selected classmate profile(s)? This action cannot be undone.`)) {
+            const error = await deleteClassmates(Array.from(selectedIds));
             if (error) {
                 alert(error);
             } else {
-                setSelectedClassmates(new Set());
+                setSelectedIds(new Set());
             }
         }
     };
 
     const handleMerge = () => {
-        if (selectedClassmates.size < 2) {
+        if (selectedIds.size < 2) {
             alert("Please select at least two classmates to merge.");
             return;
         }
@@ -189,13 +189,13 @@ const Classmates: React.FC = () => {
             <div className="bg-white p-6 sm:p-8 rounded-lg shadow-md">
                 <h2 className="text-2xl font-bold text-brand-text mb-6">Manage Classmate Profiles</h2>
                 
-                {selectedClassmates.size > 0 && (
+                {selectedIds.size > 0 && (
                   <div className="bg-brand-secondary text-white p-3 rounded-lg shadow-md mb-4 flex items-center justify-between sticky top-0 z-10">
-                    <span className="font-semibold">{selectedClassmates.size} classmate(s) selected</span>
+                    <span className="font-semibold">{selectedIds.size} classmate(s) selected</span>
                     <div className="flex flex-wrap gap-2 items-center">
                       <button onClick={() => handleStatusUpdate('Active')} className="bg-success hover:bg-green-600 px-3 py-1 rounded-md text-sm font-medium">Activate</button>
                       <button onClick={() => handleStatusUpdate('Inactive')} className="bg-warning hover:bg-yellow-600 px-3 py-1 rounded-md text-sm font-medium text-white">De-activate</button>
-                      <button onClick={handleMerge} disabled={selectedClassmates.size < 2} className="bg-brand-accent hover:bg-blue-400 px-3 py-1 rounded-md text-sm font-medium text-white disabled:bg-gray-400 disabled:cursor-not-allowed">Merge</button>
+                      <button onClick={handleMerge} disabled={selectedIds.size < 2} className="bg-brand-accent hover:bg-blue-400 px-3 py-1 rounded-md text-sm font-medium text-white disabled:bg-gray-400 disabled:cursor-not-allowed">Merge</button>
                       <button onClick={handleDelete} className="bg-danger hover:bg-red-700 px-3 py-1 rounded-md text-sm font-medium">Delete</button>
                     </div>
                   </div>
@@ -211,7 +211,7 @@ const Classmates: React.FC = () => {
                                       type="checkbox"
                                       className="h-4 w-4 text-brand-primary border-gray-300 rounded focus:ring-brand-primary"
                                       onChange={handleSelectAll}
-                                      checked={sortedClassmates.length > 0 && selectedClassmates.size === sortedClassmates.length}
+                                      checked={sortedClassmates.length > 0 && selectedIds.size === sortedClassmates.length}
                                   />
                                 </th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Classmate Name</th>
@@ -223,13 +223,13 @@ const Classmates: React.FC = () => {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {sortedClassmates.map(classmate => (
-                                <tr key={classmate.name} className={selectedClassmates.has(classmate.name) ? 'bg-brand-accent/20' : ''}>
+                                <tr key={classmate.id} className={selectedIds.has(classmate.id) ? 'bg-brand-accent/20' : ''}>
                                     <td className="p-4">
                                         <input
                                             type="checkbox"
                                             className="h-4 w-4 text-brand-primary border-gray-300 rounded focus:ring-brand-primary"
-                                            checked={selectedClassmates.has(classmate.name)}
-                                            onChange={() => handleSelectOne(classmate.name)}
+                                            checked={selectedIds.has(classmate.id)}
+                                            onChange={() => handleSelectOne(classmate.id)}
                                         />
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{classmate.name}</td>
@@ -267,10 +267,10 @@ const Classmates: React.FC = () => {
             )}
             {isMergeModalOpen && (
                 <MergeClassmatesModal 
-                    selectedNames={Array.from(selectedClassmates)}
-                    onMerge={(target, sources) => {
-                        mergeClassmates(target, sources);
-                        setSelectedClassmates(new Set());
+                    selectedClassmates={classmates.filter(c => selectedIds.has(c.id))}
+                    onMerge={(targetId, sourceIds) => {
+                        mergeClassmates(targetId, sourceIds);
+                        setSelectedIds(new Set());
                     }}
                     onClose={() => setIsMergeModalOpen(false)}
                 />
