@@ -58,6 +58,9 @@ export interface User {
 export interface Classmate {
     name: string;
     role: UserRole;
+    email?: string;
+    address?: string;
+    phone?: string;
 }
 
 export interface IntegrationService {
@@ -93,5 +96,5 @@ export interface DataContextType {
   updateIntegrationSettings: (service: keyof IntegrationSettings, settings: IntegrationService) => void;
   updateUserName: (newName: string) => void;
   classmates: Classmate[];
-  updateClassmateRole: (name: string, role: UserRole) => void;
+  updateClassmate: (name: string, updatedData: Partial<Classmate>) => void;
 }

@@ -12,16 +12,11 @@ const Transactions: React.FC = () => {
     if (!user?.name) {
       return [];
     }
-    const userNameParts = user.name.toLowerCase().split(' ').filter(p => p); // Get non-empty parts
-
-    return transactions.filter(t => {
-      if (!t.classmateName) {
-        return false;
-      }
-      const transactionNameLower = t.classmateName.toLowerCase();
-      // Check if every part of the user's name is present in the transaction's classmateName
-      return userNameParts.every(part => transactionNameLower.includes(part));
-    });
+    // Use an exact, case-insensitive match for the name to ensure accuracy.
+    const currentUserName = user.name.trim().toLowerCase();
+    return transactions.filter(t => 
+      t.classmateName && t.classmateName.trim().toLowerCase() === currentUserName
+    );
   }, [transactions, user]);
 
   const filteredTransactions = useMemo(() => {

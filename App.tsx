@@ -122,7 +122,13 @@ const App: React.FC = () => {
       const existingNames = new Set(prevClassmates.map(c => c.name));
       const newClassmatesToAdd = uniqueNames
         .filter(name => !existingNames.has(name))
-        .map(name => ({ name, role: 'Standard' as UserRole }));
+        .map(name => ({
+             name, 
+             role: 'Standard' as UserRole,
+             email: '',
+             address: '',
+             phone: '' 
+        }));
 
       if (newClassmatesToAdd.length > 0) {
         return [...prevClassmates, ...newClassmatesToAdd].sort((a,b) => a.name.localeCompare(b.name));
@@ -145,20 +151,29 @@ const App: React.FC = () => {
   
 
   const handleLogin = (loggedInUser: Pick<User, 'id' | 'name' | 'email'>) => {
-    const foundClassmate = classmates.find(c =>
-        c.name.toLowerCase() === loggedInUser.name.toLowerCase()
-    );
-
-    const role: UserRole = loggedInUser.email === 'dues_beachhigh89@comcast.net'
-        ? 'Admin'
-        : foundClassmate
-        ? foundClassmate.role
-        : 'Standard';
-
-    const finalUser: User = {
+    // Admin user is a special case and is identified by email
+    if (loggedInUser.email === 'dues_beachhigh89@comcast.net') {
+      const adminUser: User = {
         ...loggedInUser,
-        role,
-        isAdmin: role === 'Admin',
+        role: 'Admin',
+        isAdmin: true,
+      };
+      setUser(adminUser);
+      setCurrentPage('dashboard');
+      return;
+    }
+
+    // For other users, find their profile by email
+    const foundClassmate = classmates.find(c => c.email?.trim().toLowerCase() === loggedInUser.email.trim().toLowerCase());
+
+    // Construct the final user object for the session
+    const finalUser: User = {
+      ...loggedInUser,
+      // If a classmate profile is found, use their name and role.
+      // Otherwise, default to the name from Google and a 'Standard' role.
+      name: foundClassmate ? foundClassmate.name : loggedInUser.name,
+      role: foundClassmate ? foundClassmate.role : 'Standard',
+      isAdmin: foundClassmate ? foundClassmate.role === 'Admin' : false,
     };
 
     setUser(finalUser);
@@ -238,8 +253,8 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const updateClassmateRole = useCallback((name: string, role: UserRole) => {
-    setClassmates(prev => prev.map(c => c.name === name ? { ...c, role } : c));
+  const updateClassmate = useCallback((name: string, updatedData: Partial<Classmate>) => {
+    setClassmates(prev => prev.map(c => c.name === name ? { ...c, ...updatedData } : c));
   }, []);
 
 
@@ -264,8 +279,8 @@ const App: React.FC = () => {
     updateIntegrationSettings,
     updateUserName,
     classmates: classmates || [],
-    updateClassmateRole,
-  }), [user, userSettings, transactions, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, addAnnouncement, deleteAnnouncement, setLogo, setSubtitle, updateIntegrationSettings, updateUserName, classmates, updateClassmateRole]);
+    updateClassmate,
+  }), [user, userSettings, transactions, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, addAnnouncement, deleteAnnouncement, setLogo, setSubtitle, updateIntegrationSettings, updateUserName, classmates, updateClassmate]);
 
   const renderPage = () => {
     switch (currentPage) {
