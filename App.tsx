@@ -127,7 +127,8 @@ const App: React.FC = () => {
              role: 'Standard' as UserRole,
              email: '',
              address: '',
-             phone: '' 
+             phone: '',
+             status: 'Active' as 'Active' | 'Inactive'
         }));
 
       if (newClassmatesToAdd.length > 0) {
@@ -165,6 +166,12 @@ const App: React.FC = () => {
 
     // For other users, find their profile by email
     const foundClassmate = classmates.find(c => c.email?.trim().toLowerCase() === loggedInUser.email.trim().toLowerCase());
+
+    if (foundClassmate && foundClassmate.status === 'Inactive') {
+      // Ideally, show a more user-friendly modal or message
+      alert("Your account is currently inactive. Please contact the administrator.");
+      return; // Stop the login process
+    }
 
     // Construct the final user object for the session
     const finalUser: User = {
@@ -257,6 +264,33 @@ const App: React.FC = () => {
     setClassmates(prev => prev.map(c => c.name === name ? { ...c, ...updatedData } : c));
   }, []);
 
+  const mergeClassmates = useCallback((targetName: string, sourceNames: string[]) => {
+    // Re-assign transactions from source classmates to the target classmate
+    setTransactions(prev => prev.map(t =>
+      sourceNames.includes(t.classmateName)
+        ? { ...t, classmateName: targetName }
+        : t
+    ));
+    // Remove the source classmate profiles
+    setClassmates(prev => prev.filter(c => !sourceNames.includes(c.name)));
+  }, []);
+
+  const deleteClassmates = useCallback((namesToDelete: string[]): string | null => {
+      const classmatesWithTransactions = transactions.filter(t => namesToDelete.includes(t.classmateName)).map(t => t.classmateName);
+      const uniqueNamesWithTransactions = [...new Set(classmatesWithTransactions)];
+      
+      if (uniqueNamesWithTransactions.length > 0) {
+        return `Cannot delete. The following classmates have associated transactions: ${uniqueNamesWithTransactions.join(', ')}. Please merge or re-assign their transactions first.`;
+      }
+      
+      setClassmates(prev => prev.filter(c => !namesToDelete.includes(c.name)));
+      return null; // Success
+  }, [transactions]);
+
+  const updateClassmatesStatus = useCallback((namesToUpdate: string[], status: 'Active' | 'Inactive') => {
+    setClassmates(prev => prev.map(c => namesToUpdate.includes(c.name) ? { ...c, status } : c));
+  }, []);
+
 
   const dataProviderValue = useMemo(() => ({
     user,
@@ -280,7 +314,10 @@ const App: React.FC = () => {
     updateUserName,
     classmates: classmates || [],
     updateClassmate,
-  }), [user, userSettings, transactions, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, addAnnouncement, deleteAnnouncement, setLogo, setSubtitle, updateIntegrationSettings, updateUserName, classmates, updateClassmate]);
+    mergeClassmates,
+    deleteClassmates,
+    updateClassmatesStatus,
+  }), [user, userSettings, transactions, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, addAnnouncement, deleteAnnouncement, setLogo, setSubtitle, updateIntegrationSettings, updateUserName, classmates, updateClassmate, mergeClassmates, deleteClassmates, updateClassmatesStatus]);
 
   const renderPage = () => {
     switch (currentPage) {

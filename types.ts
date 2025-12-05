@@ -61,6 +61,7 @@ export interface Classmate {
     email?: string;
     address?: string;
     phone?: string;
+    status: 'Active' | 'Inactive';
 }
 
 export interface IntegrationService {
@@ -97,4 +98,7 @@ export interface DataContextType {
   updateUserName: (newName: string) => void;
   classmates: Classmate[];
   updateClassmate: (name: string, updatedData: Partial<Classmate>) => void;
+  mergeClassmates: (targetClassmateName: string, sourceClassmateNames: string[]) => void;
+  deleteClassmates: (classmateNames: string[]) => string | null; // Returns error message or null
+  updateClassmatesStatus: (classmateNames: string[], status: 'Active' | 'Inactive') => void;
 }
