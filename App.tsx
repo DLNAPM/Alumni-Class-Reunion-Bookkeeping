@@ -10,6 +10,7 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Profile from './components/Profile';
 import Classmates from './components/Classmates';
+import HelpModal from './components/HelpModal';
 import type { User, Transaction, Announcement, IntegrationSettings, IntegrationService, Classmate, UserRole } from './types';
 // Fix: Updated imports to match Firebase v8 SDK structure provided by the updated firebase.ts file.
 import { auth, db, Timestamp } from './firebase';
@@ -36,6 +37,7 @@ const App: React.FC = () => {
   // User-specific settings state
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const [isHelpModalOpen, setHelpModalOpen] = useState(false);
   
   const [firestoreListeners, setFirestoreListeners] = useState<(() => void)[]>([]);
 
@@ -488,12 +490,13 @@ const App: React.FC = () => {
       <div className="flex h-screen bg-brand-background text-brand-text">
         <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} onLogout={handleLogout} />
         <div className="flex-1 flex flex-col overflow-hidden">
-          <Header />
+          <Header onHelpClick={() => setHelpModalOpen(true)} />
           <main className="flex-1 overflow-x-hidden overflow-y-auto bg-brand-background p-4 sm:p-6 lg:p-8">
             {renderPage()}
           </main>
         </div>
       </div>
+      <HelpModal isOpen={isHelpModalOpen} onClose={() => setHelpModalOpen(false)} />
     </DataProvider>
   );
 };

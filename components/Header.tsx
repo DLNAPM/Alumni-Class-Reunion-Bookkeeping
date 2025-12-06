@@ -1,8 +1,11 @@
-
 import React from 'react';
 import { useData } from '../context/DataContext';
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  onHelpClick: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ onHelpClick }) => {
   const { user, subtitle } = useData();
 
   return (
@@ -11,10 +14,21 @@ const Header: React.FC = () => {
         <h1 className="text-lg font-bold text-brand-primary">Alumni Bookkeeping</h1>
         <p className="text-sm text-gray-600 -mt-1">{subtitle}</p>
       </div>
-      <div className="flex items-center">
-        <span className="text-gray-600 mr-3 hidden sm:inline">Welcome, {user?.name}</span>
-        <div className="w-10 h-10 rounded-full bg-brand-accent flex items-center justify-center text-white font-bold">
-          {user?.name.charAt(0)}
+      <div className="flex items-center space-x-4">
+        <button
+          onClick={onHelpClick}
+          className="p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-brand-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary"
+          aria-label="Help"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.546-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+        <div className="flex items-center">
+            <span className="text-gray-600 mr-3 hidden sm:inline">Welcome, {user?.name}</span>
+            <div className="w-10 h-10 rounded-full bg-brand-accent flex items-center justify-center text-white font-bold">
+            {user?.name.charAt(0)}
+            </div>
         </div>
       </div>
     </header>
