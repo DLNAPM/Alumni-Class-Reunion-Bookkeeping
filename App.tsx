@@ -481,23 +481,25 @@ const App: React.FC = () => {
     );
   }
 
-  if (!user) {
-    return <Login onGuestLogin={handleGuestLogin} />;
-  }
-
   return (
-    <DataProvider value={dataProviderValue}>
-      <div className="flex h-screen bg-brand-background text-brand-text">
-        <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} onLogout={handleLogout} />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Header onHelpClick={() => setHelpModalOpen(true)} />
-          <main className="flex-1 overflow-x-hidden overflow-y-auto bg-brand-background p-4 sm:p-6 lg:p-8">
-            {renderPage()}
-          </main>
-        </div>
-      </div>
+    <>
+      {!user ? (
+        <Login onGuestLogin={handleGuestLogin} onHelpClick={() => setHelpModalOpen(true)} />
+      ) : (
+        <DataProvider value={dataProviderValue}>
+          <div className="flex h-screen bg-brand-background text-brand-text">
+            <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} onLogout={handleLogout} />
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <Header onHelpClick={() => setHelpModalOpen(true)} />
+              <main className="flex-1 overflow-x-hidden overflow-y-auto bg-brand-background p-4 sm:p-6 lg:p-8">
+                {renderPage()}
+              </main>
+            </div>
+          </div>
+        </DataProvider>
+      )}
       <HelpModal isOpen={isHelpModalOpen} onClose={() => setHelpModalOpen(false)} />
-    </DataProvider>
+    </>
   );
 };
 
