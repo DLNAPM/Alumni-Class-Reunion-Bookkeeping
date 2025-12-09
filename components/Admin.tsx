@@ -5,7 +5,6 @@ import { PaymentCategory, Transaction, PaymentType, IntegrationSettings, Announc
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 
-// Fix: Removed unused and incorrect EditableTransaction type. The Transaction type is used directly for editing.
 type BulkEditData = {
   category?: PaymentCategory;
   paymentType?: PaymentType;
@@ -23,7 +22,6 @@ const Admin: React.FC = () => {
   
   const isReadOnly = user?.role === 'Admin_ro';
 
-  // Fix: Changed editingTransaction state to use the correct Transaction type.
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [filter, setFilter] = useState('');
@@ -44,10 +42,8 @@ const Admin: React.FC = () => {
 
   const [reconciliationModalOpen, setReconciliationModalOpen] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState<Transaction[][]>([]);
-  // Fix: Transaction IDs are strings. Changed state to hold a Set of strings.
   const [transactionsToDelete, setTransactionsToDelete] = useState<Set<string>>(new Set());
   
-  // Fix: Transaction IDs are strings. Changed state to hold a Set of strings.
   const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
   const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false);
   const [bulkEditData, setBulkEditData] = useState<BulkEditData>({});
@@ -98,6 +94,16 @@ const Admin: React.FC = () => {
       }
     }
   };
+  
+  const handleRemoveAttachmentNew = () => {
+    setNewTransaction(prev => ({ ...prev, attachmentUrl: undefined, attachmentName: undefined }));
+  };
+
+  const handleRemoveAttachmentEdit = () => {
+    if (editingTransaction) {
+      setEditingTransaction({ ...editingTransaction, attachmentUrl: undefined, attachmentName: undefined });
+    }
+  };
 
   const handleAddNewTransaction = (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,7 +131,6 @@ const Admin: React.FC = () => {
     setIsEditModalOpen(false);
   };
 
-  // Fix: Simplified handler to work with the correct Transaction type, removing the need for a type cast.
   const handleUpdateTransaction = () => {
     if (editingTransaction) {
       updateTransaction(editingTransaction);
@@ -133,7 +138,6 @@ const Admin: React.FC = () => {
     }
   };
   
-  // Fix: The transaction ID is a string. Changed parameter type from number to string.
   const handleDeleteTransaction = (id: string) => {
     if (window.confirm('Are you sure you want to delete this transaction?')) {
       deleteTransaction(id);
@@ -337,7 +341,6 @@ const Admin: React.FC = () => {
     setReconciliationModalOpen(true);
   }, [transactions]);
 
-  // Fix: The transaction ID is a string. Changed parameter type from number to string.
   const toggleTransactionToDelete = (id: string) => {
     setTransactionsToDelete(prev => {
       const newSet = new Set(prev);
@@ -377,7 +380,6 @@ const Admin: React.FC = () => {
     }
   };
 
-  // Fix: The transaction ID is a string. Changed parameter type from number to string.
   const handleSelectTransaction = (id: string) => {
     setSelectedTransactions(prev => {
       const newSet = new Set(prev);
@@ -646,7 +648,12 @@ const Admin: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700">Receipt/Document (JPEG, PDF)</label>
                   <input type="file" onChange={handleNewTransactionFileChange} accept=".jpg,.jpeg,.png,.bmp,.pdf" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-primary hover:file:bg-brand-accent/30" />
                   {uploadingFile && <span className="text-sm text-gray-500">Uploading...</span>}
-                  {newTransaction.attachmentUrl && <span className="text-sm text-green-500 block">File Attached: {newTransaction.attachmentName}</span>}
+                  {newTransaction.attachmentUrl && (
+                    <div className="flex items-center mt-2">
+                        <span className="text-sm text-green-500 block mr-2">File Attached: {newTransaction.attachmentName}</span>
+                        <button type="button" onClick={handleRemoveAttachmentNew} className="text-xs text-red-500 hover:text-red-700 underline">Remove</button>
+                    </div>
+                  )}
               </div>
               )}
 
@@ -735,8 +742,9 @@ const Admin: React.FC = () => {
                <div>
                   <label className="block text-sm font-medium text-gray-700">Receipt/Document (JPEG, PDF)</label>
                   {editingTransaction.attachmentUrl && (
-                      <div className="mb-2 text-sm text-gray-600">
-                          Current File: <a href={editingTransaction.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{editingTransaction.attachmentName || "View File"}</a>
+                      <div className="mb-2 text-sm text-gray-600 flex items-center">
+                          <span className="mr-2">Current File: <a href={editingTransaction.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{editingTransaction.attachmentName || "View File"}</a></span>
+                          <button type="button" onClick={handleRemoveAttachmentEdit} className="text-xs text-red-500 hover:text-red-700 underline">Remove</button>
                       </div>
                   )}
                   <input type="file" onChange={handleEditTransactionFileChange} accept=".jpg,.jpeg,.png,.bmp,.pdf" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-primary hover:file:bg-brand-accent/30" />
