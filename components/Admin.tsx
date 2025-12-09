@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { PaymentCategory, Transaction, PaymentType, IntegrationSettings, Announcement } from '../types';
@@ -640,12 +641,14 @@ const Admin: React.FC = () => {
               </select>
               <input type="text" name="transactionId" placeholder="Transaction ID (Optional)" value={newTransaction.transactionId} onChange={handleNewTransactionChange} className="w-full border-gray-300 rounded-md shadow-sm" />
               
+              {newTransaction.category === PaymentCategory.Expense && (
               <div>
                   <label className="block text-sm font-medium text-gray-700">Receipt/Document (JPEG, PDF)</label>
                   <input type="file" onChange={handleNewTransactionFileChange} accept=".jpg,.jpeg,.png,.bmp,.pdf" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-primary hover:file:bg-brand-accent/30" />
                   {uploadingFile && <span className="text-sm text-gray-500">Uploading...</span>}
                   {newTransaction.attachmentUrl && <span className="text-sm text-green-500 block">File Attached: {newTransaction.attachmentName}</span>}
               </div>
+              )}
 
               <button type="submit" disabled={uploadingFile} className="w-full bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary disabled:bg-gray-400">Add Transaction</button>
             </form>
@@ -728,6 +731,7 @@ const Admin: React.FC = () => {
                </select>
                <input type="text" placeholder="Transaction ID" value={editingTransaction.transactionId || ''} onChange={e => setEditingTransaction({...editingTransaction, transactionId: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" />
                
+               {editingTransaction.category === PaymentCategory.Expense && (
                <div>
                   <label className="block text-sm font-medium text-gray-700">Receipt/Document (JPEG, PDF)</label>
                   {editingTransaction.attachmentUrl && (
@@ -738,6 +742,7 @@ const Admin: React.FC = () => {
                   <input type="file" onChange={handleEditTransactionFileChange} accept=".jpg,.jpeg,.png,.bmp,.pdf" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-primary hover:file:bg-brand-accent/30" />
                   {uploadingFile && <span className="text-sm text-gray-500">Uploading...</span>}
               </div>
+              )}
             </div>
             <div className="flex justify-end mt-6 space-x-4">
               <button onClick={closeEditModal} className="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300">Cancel</button>
