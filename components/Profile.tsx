@@ -5,6 +5,7 @@ const Profile: React.FC = () => {
   const { user, updateUserProfile } = useData();
   const [formData, setFormData] = useState({
     name: '',
+    email: '',
     address: '',
     phone: '',
   });
@@ -15,6 +16,7 @@ const Profile: React.FC = () => {
     if (user) {
       setFormData({
         name: user.name || '',
+        email: user.email || '',
         address: user.address || '',
         phone: user.phone || '',
       });
@@ -30,9 +32,16 @@ const Profile: React.FC = () => {
     e.preventDefault();
     if (!user) return;
 
+    if (formData.name !== user.name && window.confirm("You are changing your Display Name. This will update your historical transactions to match your new name. Continue?") === false) {
+        return;
+    }
+    
+    if (formData.email !== user.email && window.confirm("WARNING: You are changing your Login Email. This should only be done if you intend to login with a different Google Account next time. If you change this to an email that does not match your Google Account, you will lose access to this profile. Continue?") === false) {
+        return;
+    }
+
     setStatus('saving');
     
-    // Simulate API call / wait for async op
     updateUserProfile(formData)
         .then(() => {
             setStatus('success');
@@ -82,11 +91,16 @@ const Profile: React.FC = () => {
             <input
               type="email"
               id="email"
-              value={user.email}
-              disabled
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 bg-gray-100 focus:outline-none sm:text-sm rounded-md cursor-not-allowed"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              disabled={isReadOnly}
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary sm:text-sm rounded-md disabled:bg-gray-100 disabled:cursor-not-allowed"
+              required
             />
-             <p className="mt-2 text-xs text-gray-500">Email address serves as your login ID and cannot be changed here.</p>
+             <p className="mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                 <strong>Warning:</strong> This email links your profile to your Google Login. Only change this if you are migrating to a new Google Account.
+             </p>
           </div>
 
           <div>

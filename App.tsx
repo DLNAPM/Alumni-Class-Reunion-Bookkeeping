@@ -329,7 +329,10 @@ const App: React.FC = () => {
 
   const updateUserProfile = useCallback(async (data: Partial<User>) => {
     if (user) {
-      // 1. Update the User context state
+      const newName = data.name;
+      const oldName = user.name;
+      
+      // 1. Update the User context state (optimistic)
       setUser({ ...user, ...data });
 
       // 2. Update the 'users' collection (profile settings)
@@ -339,16 +342,34 @@ const App: React.FC = () => {
 
       // 3. Update the 'classmates' collection to keep admin view in sync
       if (user.email) {
+          // Use the *current* (old) email to find the record, in case we are updating the email.
           const classmatesQuery = db.collection('classmates').where('email', '==', user.email);
           const querySnapshot = await classmatesQuery.get();
           if (!querySnapshot.empty) {
               const classmateDoc = querySnapshot.docs[0];
-              await classmateDoc.ref.update({
-                  name: data.name || user.name,
+              const updatePayload: any = {
                   address: data.address || user.address,
                   phone: data.phone || user.phone
-              });
+              };
+              
+              if (data.name) updatePayload.name = data.name;
+              if (data.email) updatePayload.email = data.email;
+
+              await classmateDoc.ref.update(updatePayload);
           }
+      }
+
+      // 4. If name changed, update all associated transactions to maintain linkage
+      if (newName && newName !== oldName) {
+           const transactionsQuery = db.collection('transactions').where('classmateName', '==', oldName);
+           const txSnapshot = await transactionsQuery.get();
+           if (!txSnapshot.empty) {
+               const batch = db.batch();
+               txSnapshot.docs.forEach(doc => {
+                   batch.update(doc.ref, { classmateName: newName });
+               });
+               await batch.commit();
+           }
       }
     }
   }, [user, updateUserDoc]);
