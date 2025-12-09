@@ -13,7 +13,7 @@ import Classmates from './components/Classmates';
 import HelpModal from './components/HelpModal';
 import type { User, Transaction, Announcement, IntegrationSettings, IntegrationService, Classmate, UserRole } from './types';
 // Fix: Updated imports to match Firebase v8 SDK structure provided by the updated firebase.ts file.
-import { auth, db, Timestamp } from './firebase';
+import { auth, db, storage, Timestamp } from './firebase';
 import type { FirebaseUser } from './firebase';
 
 
@@ -62,6 +62,8 @@ const App: React.FC = () => {
             let finalRole: UserRole = 'Standard';
             let finalName = firebaseUser.displayName || 'New User';
             let finalIsAdmin = isAdminByEmail;
+            let finalAddress = '';
+            let finalPhone = '';
 
             // Fix: Explicitly set the role for the primary admin to ensure correct permissions.
             if (isAdminByEmail) {
@@ -83,6 +85,8 @@ const App: React.FC = () => {
                     }
                     finalRole = classmateData.role;
                     finalName = classmateData.name;
+                    finalAddress = classmateData.address || '';
+                    finalPhone = classmateData.phone || '';
                     // Also allow for other users to be designated as Admins from the Classmates panel
                     finalIsAdmin = classmateData.role === 'Admin';
                 }
@@ -105,12 +109,21 @@ const App: React.FC = () => {
             const newUserProfile = {
                 name: finalName,
                 email: firebaseUser.email,
+                address: finalAddress,
+                phone: finalPhone,
                 ...defaultSettings
             };
             // Fix: Use Firebase v8 Firestore method `set()`.
             await userDocRef.set(newUserProfile);
             // Fix: Use Firebase v8 Firestore method `get()`.
             userDocSnap = await userDocRef.get(); // Re-fetch the doc
+            } else {
+                // If user exists, try to sync local state with what's in Firestore or Classmates
+                const data = userDocSnap.data();
+                if(data) {
+                    finalAddress = data.address || finalAddress;
+                    finalPhone = data.phone || finalPhone;
+                }
             }
 
             // Set up app user object for the session
@@ -120,6 +133,8 @@ const App: React.FC = () => {
             email: firebaseUser.email,
             isAdmin: finalIsAdmin,
             role: finalRole,
+            address: finalAddress,
+            phone: finalPhone
             };
             setUser(appUser);
             
@@ -134,6 +149,8 @@ const App: React.FC = () => {
                         subtitle: data.subtitle || '',
                         integrationSettings: data.integrationSettings || {},
                     });
+                    // Also update user state if address/phone changes in DB
+                    setUser(prev => prev ? ({...prev, address: data.address || '', phone: data.phone || '', name: data.name || prev.name}) : null);
                 }
             });
 
@@ -310,12 +327,36 @@ const App: React.FC = () => {
     }
   }, [userSettings, updateUserDoc]);
 
-  const updateUserName = useCallback(async (newName: string) => {
+  const updateUserProfile = useCallback(async (data: Partial<User>) => {
     if (user) {
-      setUser({ ...user, name: newName });
-      await updateUserDoc({ name: newName });
+      // 1. Update the User context state
+      setUser({ ...user, ...data });
+
+      // 2. Update the 'users' collection (profile settings)
+      const { id, isAdmin, role, ...firestoreData } = data as any; 
+      // Filter out fields we don't want to save to the user settings doc if they come from User object
+      await updateUserDoc(firestoreData);
+
+      // 3. Update the 'classmates' collection to keep admin view in sync
+      if (user.email) {
+          const classmatesQuery = db.collection('classmates').where('email', '==', user.email);
+          const querySnapshot = await classmatesQuery.get();
+          if (!querySnapshot.empty) {
+              const classmateDoc = querySnapshot.docs[0];
+              await classmateDoc.ref.update({
+                  name: data.name || user.name,
+                  address: data.address || user.address,
+                  phone: data.phone || user.phone
+              });
+          }
+      }
     }
   }, [user, updateUserDoc]);
+  
+  // Deprecated wrapper for backward compatibility if needed, but Profile.tsx now uses updateUserProfile
+  const updateUserName = useCallback(async (newName: string) => {
+      await updateUserProfile({ name: newName });
+  }, [updateUserProfile]);
 
   const updateClassmate = useCallback(async (id: string, updatedData: Partial<Omit<Classmate, 'id'>>) => {
       if(!id) return;
@@ -423,6 +464,13 @@ const App: React.FC = () => {
     alert(`Reconciliation complete. Merged ${mergedCount} duplicate profiles.`);
   }, [classmates, mergeClassmates]);
 
+  const uploadTransactionAttachment = useCallback(async (file: File): Promise<string> => {
+    const fileName = `${Date.now()}_${file.name}`;
+    const storageRef = storage.ref().child(`transaction_receipts/${fileName}`);
+    await storageRef.put(file);
+    return await storageRef.getDownloadURL();
+  }, []);
+
   const dataProviderValue = useMemo(() => ({
     user,
     logo: userSettings?.logo || '', setLogo,
@@ -432,17 +480,19 @@ const App: React.FC = () => {
     classBalance: transactions.reduce((acc, t) => acc + t.amount, 0) || 0,
     integrationSettings: userSettings?.integrationSettings || { cashApp: { connected: false, identifier: '' }, payPal: { connected: false, identifier: '' }, zelle: { connected: false, identifier: '' }, bank: { connected: false, identifier: '' } },
     updateIntegrationSettings,
-    updateUserName,
+    updateUserProfile,
+    updateUserName, // kept for compatibility if needed, but UI uses updateUserProfile
+    uploadTransactionAttachment,
     classmates, updateClassmate, mergeClassmates, deleteClassmates, updateClassmatesStatus,
     reconcileDuplicateClassmates,
-  }), [user, userSettings, transactions, classmates, setLogo, setSubtitle, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, addAnnouncement, deleteAnnouncement, updateIntegrationSettings, updateUserName, updateClassmate, mergeClassmates, deleteClassmates, updateClassmatesStatus, reconcileDuplicateClassmates]);
+  }), [user, userSettings, transactions, classmates, setLogo, setSubtitle, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, addAnnouncement, deleteAnnouncement, updateIntegrationSettings, updateUserProfile, updateUserName, updateClassmate, mergeClassmates, deleteClassmates, updateClassmatesStatus, reconcileDuplicateClassmates, uploadTransactionAttachment]);
 
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard': return <Dashboard />;
       case 'payment': return user?.role === 'Admin' ? <MakePayment /> : <Dashboard />;
       case 'transactions': return user?.role !== 'Guest' ? <Transactions /> : <Dashboard />;
-      case 'profile': return (user?.role === 'Admin' || user?.role === 'Admin_ro') ? <Profile /> : <Dashboard />;
+      case 'profile': return (user?.role === 'Admin' || user?.role === 'Admin_ro' || user?.role === 'Standard') ? <Profile /> : <Dashboard />;
       case 'admin': return (user?.role === 'Admin' || user?.role === 'Admin_ro') ? <Admin /> : <Dashboard />;
       case 'classmates': return (user?.role === 'Admin' || user?.role === 'Admin_ro') ? <Classmates /> : <Dashboard />;
       case 'reporting': return (user?.role === 'Admin' || user?.role === 'Admin_ro') ? <Reporting /> : <Dashboard />;

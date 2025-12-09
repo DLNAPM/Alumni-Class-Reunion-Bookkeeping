@@ -17,7 +17,7 @@ const Admin: React.FC = () => {
     user,
     transactions, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, 
     logo, setLogo, subtitle, setSubtitle, integrationSettings, updateIntegrationSettings,
-    announcements, addAnnouncement, deleteAnnouncement
+    announcements, addAnnouncement, deleteAnnouncement, uploadTransactionAttachment
   } = useData();
   
   const isReadOnly = user?.role === 'Admin_ro';
@@ -29,6 +29,7 @@ const Admin: React.FC = () => {
   const [sortConfig, setSortConfig] = useState<{ key: keyof Transaction; direction: 'asc' | 'desc' } | null>({ key: 'date', direction: 'desc' });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importStatus, setImportStatus] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   const [newTransaction, setNewTransaction] = useState<Omit<Transaction, 'id'>>({
     date: new Date().toISOString().split('T')[0],
@@ -63,6 +64,38 @@ const Admin: React.FC = () => {
   const handleNewTransactionChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setNewTransaction(prev => ({ ...prev, [name]: name === 'amount' ? parseFloat(value) : value }));
+  };
+  
+  const handleNewTransactionFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadingFile(true);
+      try {
+        const url = await uploadTransactionAttachment(file);
+        setNewTransaction(prev => ({ ...prev, attachmentUrl: url, attachmentName: file.name }));
+      } catch (err) {
+        console.error("Upload failed", err);
+        alert("Failed to upload file");
+      } finally {
+        setUploadingFile(false);
+      }
+    }
+  };
+
+  const handleEditTransactionFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && editingTransaction) {
+      setUploadingFile(true);
+      try {
+        const url = await uploadTransactionAttachment(file);
+        setEditingTransaction(prev => prev ? ({ ...prev, attachmentUrl: url, attachmentName: file.name }) : null);
+      } catch (err) {
+        console.error("Upload failed", err);
+        alert("Failed to upload file");
+      } finally {
+        setUploadingFile(false);
+      }
+    }
   };
 
   const handleAddNewTransaction = (e: React.FormEvent) => {
@@ -507,6 +540,7 @@ const Admin: React.FC = () => {
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('paymentType')}>Payment Type {getSortIndicator('paymentType')}</th>
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('transactionId')}>Transaction ID {getSortIndicator('transactionId')}</th>
                     <th className="px-4 py-2 text-right font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('amount')}>Amount {getSortIndicator('amount')}</th>
+                    <th className="px-4 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Receipt</th>
                     {!isReadOnly && <th className="px-4 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Actions</th>}
                   </tr>
                 </thead>
@@ -530,6 +564,15 @@ const Admin: React.FC = () => {
                       <td className="px-4 py-2 whitespace-nowrap text-xs">{t.paymentType}</td>
                       <td className="px-4 py-2 whitespace-nowrap text-gray-500 truncate max-w-xs" title={t.transactionId}>{t.transactionId || ''}</td>
                       <td className="px-4 py-2 whitespace-nowrap text-right font-semibold">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(t.amount)}</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-center">
+                          {t.attachmentUrl ? (
+                              <a href={t.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700" title={t.attachmentName || "View Receipt"}>
+                                  <svg className="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                              </a>
+                          ) : (
+                              <span className="text-gray-300">-</span>
+                          )}
+                      </td>
                       {!isReadOnly && (
                       <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
                         <button onClick={() => openEditModal(t)} className="text-brand-secondary hover:text-brand-primary mr-3">Edit</button>
@@ -539,7 +582,7 @@ const Admin: React.FC = () => {
                     </tr>
                   ))}
                    {sortedTransactions.length === 0 && (
-                        <tr><td colSpan={isReadOnly ? 8 : 9} className="text-center py-10 text-gray-500">No transactions match your search.</td></tr>
+                        <tr><td colSpan={isReadOnly ? 9 : 10} className="text-center py-10 text-gray-500">No transactions match your search.</td></tr>
                     )}
                 </tbody>
               </table>
@@ -596,7 +639,15 @@ const Admin: React.FC = () => {
                 {Object.values(PaymentType).map(pt => <option key={pt} value={pt}>{pt}</option>)}
               </select>
               <input type="text" name="transactionId" placeholder="Transaction ID (Optional)" value={newTransaction.transactionId} onChange={handleNewTransactionChange} className="w-full border-gray-300 rounded-md shadow-sm" />
-              <button type="submit" className="w-full bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary">Add Transaction</button>
+              
+              <div>
+                  <label className="block text-sm font-medium text-gray-700">Receipt/Document (JPEG, PDF)</label>
+                  <input type="file" onChange={handleNewTransactionFileChange} accept=".jpg,.jpeg,.png,.bmp,.pdf" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-primary hover:file:bg-brand-accent/30" />
+                  {uploadingFile && <span className="text-sm text-gray-500">Uploading...</span>}
+                  {newTransaction.attachmentUrl && <span className="text-sm text-green-500 block">File Attached: {newTransaction.attachmentName}</span>}
+              </div>
+
+              <button type="submit" disabled={uploadingFile} className="w-full bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary disabled:bg-gray-400">Add Transaction</button>
             </form>
           </div>
           )}
@@ -662,7 +713,7 @@ const Admin: React.FC = () => {
       {/* Edit Modal */}
       {isEditModalOpen && editingTransaction && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
+          <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg overflow-y-auto max-h-[90vh]">
             <h3 className="text-xl font-semibold mb-4">Edit Transaction</h3>
             <div className="space-y-4">
                <input type="date" value={editingTransaction.date} onChange={e => setEditingTransaction({...editingTransaction, date: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" />
@@ -676,10 +727,21 @@ const Admin: React.FC = () => {
                  {Object.values(PaymentType).map(pt => <option key={pt} value={pt}>{pt}</option>)}
                </select>
                <input type="text" placeholder="Transaction ID" value={editingTransaction.transactionId || ''} onChange={e => setEditingTransaction({...editingTransaction, transactionId: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" />
+               
+               <div>
+                  <label className="block text-sm font-medium text-gray-700">Receipt/Document (JPEG, PDF)</label>
+                  {editingTransaction.attachmentUrl && (
+                      <div className="mb-2 text-sm text-gray-600">
+                          Current File: <a href={editingTransaction.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{editingTransaction.attachmentName || "View File"}</a>
+                      </div>
+                  )}
+                  <input type="file" onChange={handleEditTransactionFileChange} accept=".jpg,.jpeg,.png,.bmp,.pdf" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-primary hover:file:bg-brand-accent/30" />
+                  {uploadingFile && <span className="text-sm text-gray-500">Uploading...</span>}
+              </div>
             </div>
             <div className="flex justify-end mt-6 space-x-4">
               <button onClick={closeEditModal} className="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300">Cancel</button>
-              <button onClick={handleUpdateTransaction} className="bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary">Save Changes</button>
+              <button onClick={handleUpdateTransaction} disabled={uploadingFile} className="bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary disabled:bg-gray-400">Save Changes</button>
             </div>
           </div>
         </div>

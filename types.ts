@@ -33,6 +33,8 @@ export interface Transaction {
   amount: number;
   classmateName: string;
   transactionId?: string;
+  attachmentUrl?: string; // URL to the uploaded receipt/doc
+  attachmentName?: string; // Name of the file
 }
 
 export interface Announcement {
@@ -53,6 +55,8 @@ export interface User {
   email: string;
   isAdmin: boolean;
   role: UserRole;
+  address?: string;
+  phone?: string;
 }
 
 export interface Classmate {
@@ -96,7 +100,8 @@ export interface DataContextType {
   classBalance: number;
   integrationSettings: IntegrationSettings;
   updateIntegrationSettings: (service: keyof IntegrationSettings, settings: IntegrationService) => Promise<void>;
-  updateUserName: (newName: string) => Promise<void>;
+  updateUserProfile: (data: Partial<User>) => Promise<void>;
+  uploadTransactionAttachment: (file: File) => Promise<string>;
   classmates: Classmate[];
   updateClassmate: (id: string, updatedData: Partial<Omit<Classmate, 'id'>>) => Promise<void>;
   mergeClassmates: (targetClassmateId: string, sourceClassmateIds: string[]) => Promise<void>;

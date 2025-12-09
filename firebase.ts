@@ -2,6 +2,7 @@
 import firebase from "firebase/compat/app";
 import "firebase/compat/auth";
 import "firebase/compat/firestore";
+import "firebase/compat/storage";
 
 // The v8 SDK attaches the User type to the firebase namespace.
 // The original `import { User as FirebaseUser } from "firebase/auth"` is v9 syntax.
@@ -30,6 +31,7 @@ if (!firebase.apps.length) {
 // Initialize and export services
 const auth = firebase.auth();
 const db = firebase.firestore();
+const storage = firebase.storage();
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 const Timestamp = firebase.firestore.Timestamp;
 
@@ -37,6 +39,7 @@ const Timestamp = firebase.firestore.Timestamp;
 export {
   auth,
   db,
+  storage,
   googleProvider,
   Timestamp,
 };

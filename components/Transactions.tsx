@@ -79,6 +79,7 @@ const Transactions: React.FC = () => {
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('category')}>Category {getSortIndicator('category')}</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('transactionId')}>Transaction ID {getSortIndicator('transactionId')}</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('amount')}>Amount {getSortIndicator('amount')}</th>
+              <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Receipt</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -89,11 +90,20 @@ const Transactions: React.FC = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{transaction.category}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate" title={transaction.transactionId}>{transaction.transactionId || ''}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(transaction.amount)}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                  {transaction.attachmentUrl ? (
+                    <a href={transaction.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700" title={transaction.attachmentName || "View Receipt"}>
+                      View
+                    </a>
+                  ) : (
+                    <span className="text-gray-300">-</span>
+                  )}
+                </td>
               </tr>
             ))}
              {sortedTransactions.length === 0 && (
               <tr>
-                <td colSpan={5} className="text-center py-10 text-gray-500">No transactions found for the selected criteria.</td>
+                <td colSpan={6} className="text-center py-10 text-gray-500">No transactions found for the selected criteria.</td>
               </tr>
             )}
           </tbody>
