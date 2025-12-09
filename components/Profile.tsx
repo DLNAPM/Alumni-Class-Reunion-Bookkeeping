@@ -10,7 +10,6 @@ const Profile: React.FC = () => {
     phone: '',
   });
   const [status, setStatus] = useState<'idle' | 'saving' | 'success'>('idle');
-  const isReadOnly = user?.role === 'Admin_ro';
 
   useEffect(() => {
     if (user) {
@@ -79,11 +78,9 @@ const Profile: React.FC = () => {
               name="name"
               value={formData.name}
               onChange={handleChange}
-              disabled={isReadOnly}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary sm:text-sm rounded-md disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary sm:text-sm rounded-md"
               required
             />
-            {isReadOnly && <p className="mt-1 text-xs text-gray-500">Read-Only Admins cannot change their display name.</p>}
           </div>
 
           <div>
@@ -94,8 +91,7 @@ const Profile: React.FC = () => {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              disabled={isReadOnly}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary sm:text-sm rounded-md disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary sm:text-sm rounded-md"
               required
             />
              <p className="mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded">
@@ -111,8 +107,7 @@ const Profile: React.FC = () => {
               name="phone"
               value={formData.phone}
               onChange={handleChange}
-              disabled={isReadOnly}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary sm:text-sm rounded-md disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary sm:text-sm rounded-md"
               placeholder="(555) 123-4567"
             />
           </div>
@@ -124,23 +119,20 @@ const Profile: React.FC = () => {
               name="address"
               value={formData.address}
               onChange={handleChange}
-              disabled={isReadOnly}
               rows={3}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary sm:text-sm rounded-md disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary sm:text-sm rounded-md"
               placeholder="123 Alumni Way..."
             />
           </div>
 
           <div className="pt-2">
-            {!isReadOnly && (
             <button
               type="submit"
               disabled={status === 'saving'}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-brand-primary hover:bg-brand-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-brand-primary hover:bg-brand-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary disabled:bg-gray-400"
             >
               {status === 'saving' ? 'Saving...' : 'Save Changes'}
             </button>
-            )}
           </div>
         </form>
       </div>
