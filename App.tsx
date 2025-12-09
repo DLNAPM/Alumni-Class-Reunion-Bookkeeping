@@ -442,10 +442,10 @@ const App: React.FC = () => {
       case 'dashboard': return <Dashboard />;
       case 'payment': return user?.role === 'Admin' ? <MakePayment /> : <Dashboard />;
       case 'transactions': return user?.role !== 'Guest' ? <Transactions /> : <Dashboard />;
-      case 'profile': return user?.role === 'Admin' ? <Profile /> : <Dashboard />;
-      case 'admin': return user?.role === 'Admin' ? <Admin /> : <Dashboard />;
-      case 'classmates': return user?.role === 'Admin' ? <Classmates /> : <Dashboard />;
-      case 'reporting': return user?.role === 'Admin' ? <Reporting /> : <Dashboard />;
+      case 'profile': return (user?.role === 'Admin' || user?.role === 'Admin_ro') ? <Profile /> : <Dashboard />;
+      case 'admin': return (user?.role === 'Admin' || user?.role === 'Admin_ro') ? <Admin /> : <Dashboard />;
+      case 'classmates': return (user?.role === 'Admin' || user?.role === 'Admin_ro') ? <Classmates /> : <Dashboard />;
+      case 'reporting': return (user?.role === 'Admin' || user?.role === 'Admin_ro') ? <Reporting /> : <Dashboard />;
       default: return <Dashboard />;
     }
   };

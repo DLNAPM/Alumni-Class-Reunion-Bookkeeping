@@ -60,6 +60,7 @@ const EditClassmateModal: React.FC<EditModalProps> = ({ classmate, onSave, onClo
                         <select id="role" name="role" value={formData.role} onChange={handleChange} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary sm:text-sm rounded-md">
                             <option value="Admin">Admin</option>
                             <option value="Standard">Standard</option>
+                            <option value="Admin_ro">Read-Only Admin</option>
                         </select>
                     </div>
                     <div className="flex justify-end mt-6 space-x-4">
@@ -120,7 +121,9 @@ const MergeClassmatesModal: React.FC<{
 
 
 const Classmates: React.FC = () => {
-    const { classmates, updateClassmate, mergeClassmates, deleteClassmates, updateClassmatesStatus, reconcileDuplicateClassmates } = useData();
+    const { user, classmates, updateClassmate, mergeClassmates, deleteClassmates, updateClassmatesStatus, reconcileDuplicateClassmates } = useData();
+    const isReadOnly = user?.role === 'Admin_ro';
+    
     const [editingClassmate, setEditingClassmate] = useState<Classmate | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
@@ -196,9 +199,9 @@ const Classmates: React.FC = () => {
     return (
         <>
             <div className="bg-white p-6 sm:p-8 rounded-lg shadow-md">
-                <h2 className="text-2xl font-bold text-brand-text mb-6">Manage Classmate Profiles</h2>
+                <h2 className="text-2xl font-bold text-brand-text mb-6">Manage Classmate Profiles {isReadOnly && <span className="text-sm font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded ml-2">(Read-Only)</span>}</h2>
                 
-                {selectedIds.size > 0 && (
+                {!isReadOnly && selectedIds.size > 0 && (
                   <div className="bg-brand-secondary text-white p-3 rounded-lg shadow-md mb-4 flex items-center justify-between sticky top-0 z-10">
                     <span className="font-semibold">{selectedIds.size} classmate(s) selected</span>
                     <div className="flex flex-wrap gap-2 items-center">
@@ -217,6 +220,7 @@ const Classmates: React.FC = () => {
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
+                                {!isReadOnly && (
                                 <th scope="col" className="p-4">
                                   <input
                                       ref={selectAllRef}
@@ -226,16 +230,18 @@ const Classmates: React.FC = () => {
                                       checked={allSelected}
                                   />
                                 </th>
+                                )}
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Classmate Name</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email (Login)</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                                <th scope="col" className="relative px-6 py-3"><span className="sr-only">Edit</span></th>
+                                {!isReadOnly && <th scope="col" className="relative px-6 py-3"><span className="sr-only">Edit</span></th>}
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {sortedClassmates.map(classmate => (
                                 <tr key={classmate.id} className={selectedIds.has(classmate.id) ? 'bg-brand-accent/20' : ''}>
+                                    {!isReadOnly && (
                                     <td className="p-4">
                                         <input
                                             type="checkbox"
@@ -244,6 +250,7 @@ const Classmates: React.FC = () => {
                                             onChange={() => handleSelectOne(classmate.id)}
                                         />
                                     </td>
+                                    )}
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{classmate.name}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{classmate.email || 'Not set'}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -252,18 +259,24 @@ const Classmates: React.FC = () => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${classmate.role === 'Admin' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
-                                            {classmate.role}
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                            classmate.role === 'Admin' ? 'bg-green-100 text-green-800' : 
+                                            classmate.role === 'Admin_ro' ? 'bg-purple-100 text-purple-800' : 
+                                            'bg-blue-100 text-blue-800'
+                                        }`}>
+                                            {classmate.role === 'Admin_ro' ? 'Read-Only Admin' : classmate.role}
                                         </span>
                                     </td>
+                                    {!isReadOnly && (
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <button onClick={() => setEditingClassmate(classmate)} className="text-brand-secondary hover:text-brand-primary">Edit</button>
                                     </td>
+                                    )}
                                 </tr>
                             ))}
                             {sortedClassmates.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="text-center py-10 text-gray-500">No classmates found. Transactions may be empty.</td>
+                                    <td colSpan={isReadOnly ? 5 : 6} className="text-center py-10 text-gray-500">No classmates found. Transactions may be empty.</td>
                                 </tr>
                             )}
                         </tbody>

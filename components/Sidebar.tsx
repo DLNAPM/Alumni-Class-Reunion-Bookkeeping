@@ -28,13 +28,13 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, onLogout
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navigation = [
-    { name: 'dashboard', label: 'Dashboard', icon: <DashboardIcon />, roles: ['Admin', 'Standard', 'Guest'] },
+    { name: 'dashboard', label: 'Dashboard', icon: <DashboardIcon />, roles: ['Admin', 'Standard', 'Guest', 'Admin_ro'] },
     { name: 'payment', label: 'Make a Payment', icon: <PaymentIcon />, roles: ['Admin'] },
-    { name: 'transactions', label: 'My Transactions', icon: <TransactionsIcon />, roles: ['Admin', 'Standard'] },
-    { name: 'profile', label: 'My Profile', icon: <ProfileIcon />, roles: ['Admin'] },
-    { name: 'admin', label: 'Admin Panel', icon: <AdminIcon />, roles: ['Admin'] },
-    { name: 'classmates', label: 'Classmates', icon: <ClassmatesIcon />, roles: ['Admin'] },
-    { name: 'reporting', label: 'Reporting', icon: <ReportingIcon />, roles: ['Admin'] },
+    { name: 'transactions', label: 'My Transactions', icon: <TransactionsIcon />, roles: ['Admin', 'Standard', 'Admin_ro'] },
+    { name: 'profile', label: 'My Profile', icon: <ProfileIcon />, roles: ['Admin', 'Admin_ro'] },
+    { name: 'admin', label: 'Admin Panel', icon: <AdminIcon />, roles: ['Admin', 'Admin_ro'] },
+    { name: 'classmates', label: 'Classmates', icon: <ClassmatesIcon />, roles: ['Admin', 'Admin_ro'] },
+    { name: 'reporting', label: 'Reporting', icon: <ReportingIcon />, roles: ['Admin', 'Admin_ro'] },
   ];
 
   const visibleNavigation = user ? navigation.filter(item => item.roles.includes(user.role)) : [];

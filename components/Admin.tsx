@@ -14,11 +14,14 @@ type BulkEditData = {
 
 const Admin: React.FC = () => {
   const { 
+    user,
     transactions, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, 
     logo, setLogo, subtitle, setSubtitle, integrationSettings, updateIntegrationSettings,
     announcements, addAnnouncement, deleteAnnouncement
   } = useData();
   
+  const isReadOnly = user?.role === 'Admin_ro';
+
   // Fix: Changed editingTransaction state to use the correct Transaction type.
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -442,7 +445,7 @@ const Admin: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <h2 className="text-3xl font-bold text-brand-text">Admin Panel</h2>
+      <h2 className="text-3xl font-bold text-brand-text">Admin Panel {isReadOnly && <span className="text-sm font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded ml-2">(Read-Only)</span>}</h2>
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -461,7 +464,7 @@ const Admin: React.FC = () => {
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
                 />
-                 <button onClick={findDuplicates} className="bg-yellow-500 text-white py-2 px-4 rounded-md hover:bg-yellow-600 whitespace-nowrap">Reconcile Duplicates</button>
+                 {!isReadOnly && <button onClick={findDuplicates} className="bg-yellow-500 text-white py-2 px-4 rounded-md hover:bg-yellow-600 whitespace-nowrap">Reconcile Duplicates</button>}
               </div>
             </div>
              {importStatus && (
@@ -472,7 +475,7 @@ const Admin: React.FC = () => {
                 <span className="font-medium">{importStatus.type.charAt(0).toUpperCase() + importStatus.type.slice(1)}:</span> {importStatus.message}
               </div>
             )}
-             {selectedTransactions.size > 0 && (
+             {!isReadOnly && selectedTransactions.size > 0 && (
               <div className="bg-brand-secondary text-white p-3 rounded-lg shadow-md mb-4 flex items-center justify-between sticky top-0 z-10">
                 <span className="font-semibold">{selectedTransactions.size} transaction(s) selected</span>
                 <div className="flex gap-4 items-center">
@@ -486,6 +489,7 @@ const Admin: React.FC = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50 sticky top-0 z-5">
                   <tr>
+                    {!isReadOnly && (
                     <th className="px-4 py-2 w-12">
                        <input
                           ref={selectAllRef}
@@ -495,6 +499,7 @@ const Admin: React.FC = () => {
                           checked={sortedTransactions.length > 0 && selectedTransactions.size === sortedTransactions.length}
                         />
                     </th>
+                    )}
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('date')}>Date {getSortIndicator('date')}</th>
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('classmateName')}>Classmate {getSortIndicator('classmateName')}</th>
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('description')}>Description {getSortIndicator('description')}</th>
@@ -502,12 +507,13 @@ const Admin: React.FC = () => {
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('paymentType')}>Payment Type {getSortIndicator('paymentType')}</th>
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('transactionId')}>Transaction ID {getSortIndicator('transactionId')}</th>
                     <th className="px-4 py-2 text-right font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('amount')}>Amount {getSortIndicator('amount')}</th>
-                    <th className="px-4 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    {!isReadOnly && <th className="px-4 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Actions</th>}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {sortedTransactions.map(t => (
                     <tr key={t.id} className={selectedTransactions.has(t.id) ? 'bg-brand-accent/20' : ''}>
+                      {!isReadOnly && (
                       <td className="px-4 py-2">
                          <input
                             type="checkbox"
@@ -516,6 +522,7 @@ const Admin: React.FC = () => {
                             onChange={() => handleSelectTransaction(t.id)}
                           />
                       </td>
+                      )}
                       <td className="px-4 py-2 whitespace-nowrap">{new Date(t.date).toLocaleDateString()}</td>
                       <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900">{t.classmateName}</td>
                       <td className="px-4 py-2 whitespace-nowrap text-gray-600 truncate max-w-xs" title={t.description}>{t.description}</td>
@@ -523,14 +530,16 @@ const Admin: React.FC = () => {
                       <td className="px-4 py-2 whitespace-nowrap text-xs">{t.paymentType}</td>
                       <td className="px-4 py-2 whitespace-nowrap text-gray-500 truncate max-w-xs" title={t.transactionId}>{t.transactionId || ''}</td>
                       <td className="px-4 py-2 whitespace-nowrap text-right font-semibold">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(t.amount)}</td>
+                      {!isReadOnly && (
                       <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
                         <button onClick={() => openEditModal(t)} className="text-brand-secondary hover:text-brand-primary mr-3">Edit</button>
                         <button onClick={() => handleDeleteTransaction(t.id)} className="text-danger hover:text-red-700">Delete</button>
                       </td>
+                      )}
                     </tr>
                   ))}
                    {sortedTransactions.length === 0 && (
-                        <tr><td colSpan={9} className="text-center py-10 text-gray-500">No transactions match your search.</td></tr>
+                        <tr><td colSpan={isReadOnly ? 8 : 9} className="text-center py-10 text-gray-500">No transactions match your search.</td></tr>
                     )}
                 </tbody>
               </table>
@@ -539,6 +548,7 @@ const Admin: React.FC = () => {
             {/* Manage Announcements */}
             <div className="bg-white p-6 rounded-lg shadow-md">
                 <h3 className="text-xl font-semibold mb-4">Manage Announcements</h3>
+                {!isReadOnly && (
                 <form onSubmit={handleAddAnnouncement} className="space-y-4">
                   <input type="text" placeholder="Title" value={newAnnouncement.title} onChange={e => setNewAnnouncement({...newAnnouncement, title: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" required />
                   <select value={newAnnouncement.type} onChange={e => setNewAnnouncement({...newAnnouncement, type: e.target.value as 'text' | 'facebook'})} className="w-full border-gray-300 rounded-md shadow-sm">
@@ -553,14 +563,16 @@ const Admin: React.FC = () => {
                   <input type="url" placeholder="Image URL (Optional)" value={newAnnouncement.imageUrl} onChange={e => setNewAnnouncement({...newAnnouncement, imageUrl: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" />
                   <button type="submit" className="bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary">Add Announcement</button>
                 </form>
+                )}
                 <div className="mt-6 space-y-2 max-h-60 overflow-y-auto">
                     <h4 className="font-semibold">Current Announcements</h4>
                     {announcements.map(ann => (
                         <div key={ann.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
                             <span>{ann.title}</span>
-                            <button onClick={() => deleteAnnouncement(ann.id)} className="text-danger hover:text-red-700 text-sm">Delete</button>
+                            {!isReadOnly && <button onClick={() => deleteAnnouncement(ann.id)} className="text-danger hover:text-red-700 text-sm">Delete</button>}
                         </div>
                     ))}
+                    {announcements.length === 0 && <p className="text-gray-500 italic">No announcements found.</p>}
                 </div>
             </div>
 
@@ -569,6 +581,7 @@ const Admin: React.FC = () => {
         {/* Right Column */}
         <div className="space-y-8">
           {/* Manually Enter Transaction */}
+          {!isReadOnly && (
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h3 className="text-xl font-semibold mb-4">Manually Enter Transaction</h3>
             <form onSubmit={handleAddNewTransaction} className="space-y-4">
@@ -586,13 +599,16 @@ const Admin: React.FC = () => {
               <button type="submit" className="w-full bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary">Add Transaction</button>
             </form>
           </div>
+          )}
 
           {/* Import Transactions */}
+          {!isReadOnly && (
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h3 className="text-xl font-semibold mb-4">Import Transactions</h3>
             <p className="text-sm text-gray-600 mb-4">Upload a CSV or Excel file to bulk import transactions.</p>
             <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-accent/20 file:text-brand-primary hover:file:bg-brand-accent/30" />
           </div>
+          )}
 
           {/* Application Customization */}
           <div className="bg-white p-6 rounded-lg shadow-md">
@@ -600,13 +616,13 @@ const Admin: React.FC = () => {
               <div className="space-y-4">
                   <div>
                       <label className="block text-sm font-medium text-gray-700">Logo URL</label>
-                      <input type="text" value={tempLogo} onChange={e => setTempLogo(e.target.value)} className="mt-1 w-full border-gray-300 rounded-md shadow-sm"/>
+                      <input type="text" value={tempLogo} onChange={e => setTempLogo(e.target.value)} disabled={isReadOnly} className="mt-1 w-full border-gray-300 rounded-md shadow-sm disabled:bg-gray-100 disabled:cursor-not-allowed"/>
                   </div>
                   <div>
                       <label className="block text-sm font-medium text-gray-700">Application Subtitle</label>
-                      <input type="text" value={tempSubtitle} onChange={e => setTempSubtitle(e.target.value)} className="mt-1 w-full border-gray-300 rounded-md shadow-sm"/>
+                      <input type="text" value={tempSubtitle} onChange={e => setTempSubtitle(e.target.value)} disabled={isReadOnly} className="mt-1 w-full border-gray-300 rounded-md shadow-sm disabled:bg-gray-100 disabled:cursor-not-allowed"/>
                   </div>
-                  <button onClick={handleCustomizationSave} className="w-full bg-indigo-500 text-white py-2 px-4 rounded-md hover:bg-indigo-600">Save Customization</button>
+                  {!isReadOnly && <button onClick={handleCustomizationSave} className="w-full bg-indigo-500 text-white py-2 px-4 rounded-md hover:bg-indigo-600">Save Customization</button>}
               </div>
           </div>
           
@@ -620,24 +636,26 @@ const Admin: React.FC = () => {
                           <div key={service} className="p-3 border rounded-md">
                               <h4 className="font-semibold capitalize">{service}</h4>
                               <div className="flex items-center mt-2">
-                                  <input type="checkbox" id={`${service}-connected`} checked={tempIntegrationSettings[service].connected} onChange={e => handleIntegrationSettingsChange(service, 'connected', e.target.checked)} className="h-4 w-4 text-brand-primary border-gray-300 rounded"/>
+                                  <input type="checkbox" id={`${service}-connected`} checked={tempIntegrationSettings[service].connected} onChange={e => handleIntegrationSettingsChange(service, 'connected', e.target.checked)} disabled={isReadOnly} className="h-4 w-4 text-brand-primary border-gray-300 rounded disabled:cursor-not-allowed"/>
                                   <label htmlFor={`${service}-connected`} className="ml-2 block text-sm text-gray-900">Connected</label>
                               </div>
                               {tempIntegrationSettings[service].connected && (
-                                  <input type="text" placeholder="Identifier (e.g., $cashtag)" value={tempIntegrationSettings[service].identifier} onChange={e => handleIntegrationSettingsChange(service, 'identifier', e.target.value)} className="mt-2 w-full border-gray-300 rounded-md shadow-sm text-sm"/>
+                                  <input type="text" placeholder="Identifier (e.g., $cashtag)" value={tempIntegrationSettings[service].identifier} onChange={e => handleIntegrationSettingsChange(service, 'identifier', e.target.value)} disabled={isReadOnly} className="mt-2 w-full border-gray-300 rounded-md shadow-sm text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"/>
                               )}
                           </div>
                       );
                   })}
-                  <button onClick={saveIntegrationSettings} className="w-full bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600">Save Integrations</button>
+                  {!isReadOnly && <button onClick={saveIntegrationSettings} className="w-full bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600">Save Integrations</button>}
               </div>
           </div>
 
           {/* Danger Zone */}
+          {!isReadOnly && (
           <div className="bg-white p-6 rounded-lg shadow-md border-2 border-dashed border-danger">
             <h3 className="text-xl font-semibold mb-4 text-danger">Danger Zone</h3>
             <button onClick={handleClearTransactions} className="w-full bg-danger text-white py-2 px-4 rounded-md hover:bg-red-700">Delete All Transactions</button>
           </div>
+          )}
         </div>
       </div>
 

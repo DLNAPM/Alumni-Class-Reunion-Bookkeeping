@@ -45,7 +45,7 @@ export interface Announcement {
   imageUrl?: string;
 }
 
-export type UserRole = 'Admin' | 'Standard' | 'Guest';
+export type UserRole = 'Admin' | 'Standard' | 'Guest' | 'Admin_ro';
 
 export interface User {
   id: string;

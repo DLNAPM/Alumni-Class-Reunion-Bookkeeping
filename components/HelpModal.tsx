@@ -47,6 +47,16 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
             </div>
 
             <div>
+              <h4 className="font-bold text-lg text-brand-primary">Read-Only Admin Role</h4>
+              <p className="text-sm text-gray-500 mb-2">Full visibility without editing privileges.</p>
+              <ul className="list-disc list-inside space-y-1 text-gray-700">
+                <li>View the Admin Panel, Reports, Classmate Lists, and all Transactions.</li>
+                <li><strong>Cannot</strong> add, edit, or delete any data.</li>
+                <li>Useful for auditing, oversight, or transparency purposes.</li>
+              </ul>
+            </div>
+
+            <div>
               <h4 className="font-bold text-lg text-brand-primary">Standard User Role</h4>
               <p className="text-sm text-gray-500 mb-2">A personalized, read-only view of your financial history.</p>
               <ul className="list-disc list-inside space-y-1 text-gray-700">

@@ -5,6 +5,7 @@ const Profile: React.FC = () => {
   const { user, updateUserName } = useData();
   const [name, setName] = useState(user?.name || '');
   const [status, setStatus] = useState<'idle' | 'saving' | 'success'>('idle');
+  const isReadOnly = user?.role === 'Admin_ro';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,9 +46,11 @@ const Profile: React.FC = () => {
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary sm:text-sm rounded-md"
+              disabled={isReadOnly}
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-brand-secondary focus:border-brand-secondary sm:text-sm rounded-md disabled:bg-gray-100 disabled:cursor-not-allowed"
               required
             />
+            {isReadOnly && <p className="mt-1 text-xs text-gray-500">Read-Only Admins cannot change their display name.</p>}
           </div>
 
           <div>
@@ -63,6 +66,7 @@ const Profile: React.FC = () => {
           </div>
 
           <div className="pt-2">
+            {!isReadOnly && (
             <button
               type="submit"
               disabled={status === 'saving' || name === user.name}
@@ -70,6 +74,7 @@ const Profile: React.FC = () => {
             >
               {status === 'saving' ? 'Saving...' : 'Save Changes'}
             </button>
+            )}
           </div>
         </form>
       </div>
