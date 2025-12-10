@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export enum PaymentCategory {
@@ -33,8 +34,8 @@ export interface Transaction {
   amount: number;
   classmateName: string;
   transactionId?: string;
-  attachmentUrl?: string; // URL to the uploaded receipt/doc
-  attachmentName?: string; // Name of the file
+  attachmentUrl?: string | null; // URL to the uploaded receipt/doc. Null allows for deletion.
+  attachmentName?: string | null; // Name of the file. Null allows for deletion.
 }
 
 export interface Announcement {

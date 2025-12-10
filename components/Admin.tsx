@@ -96,12 +96,14 @@ const Admin: React.FC = () => {
   };
   
   const handleRemoveAttachmentNew = () => {
-    setNewTransaction(prev => ({ ...prev, attachmentUrl: undefined, attachmentName: undefined }));
+    // Explicitly set to null so Firestore deletes the field or sets it to null
+    setNewTransaction(prev => ({ ...prev, attachmentUrl: null, attachmentName: null } as any));
   };
 
   const handleRemoveAttachmentEdit = () => {
     if (editingTransaction) {
-      setEditingTransaction({ ...editingTransaction, attachmentUrl: undefined, attachmentName: undefined });
+      // Explicitly set to null so Firestore deletes the field or sets it to null
+      setEditingTransaction({ ...editingTransaction, attachmentUrl: null, attachmentName: null });
     }
   };
 
