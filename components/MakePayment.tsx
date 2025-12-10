@@ -16,7 +16,7 @@ const MakePayment: React.FC = () => {
 
     setStatus('processing');
     
-    const newTransaction: Omit<Transaction, 'id' | 'classId'> = {
+    const newTransaction: Omit<Transaction, 'id'> = {
       date: new Date().toISOString().split('T')[0],
       description: description || `${category} Payment`,
       category: category,

@@ -26,10 +26,6 @@ const App: React.FC = () => {
 
   // App State
   const [user, setUser] = useState<User | null>(null);
-  const [currentClassId, setCurrentClassId] = useState<string>('');
-  const [showClassSelector, setShowClassSelector] = useState(false);
-  const [availableClasses, setAvailableClasses] = useState<string[]>([]);
-  const [classInput, setClassInput] = useState('');
 
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -54,7 +50,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // ===============================================================================================
-  // 1. Authentication & Class Selection Logic
+  // 1. Authentication Logic
   // ===============================================================================================
 
   useEffect(() => {
@@ -64,59 +60,14 @@ const App: React.FC = () => {
       setAuthError(null);
 
       if (u) {
-        const email = u.email?.toLowerCase() || '';
-        // User is logged in. Now determine Class ID context.
-        if (email === SUPER_ADMIN_EMAIL.toLowerCase()) {
-          // Super Admin: Can enter any class ID.
-          setAvailableClasses([]);
-          setShowClassSelector(true);
-        } else {
-          // Standard User: Fetch all their associated classmate records to find classIds.
-          try {
-            const snaps = await db.collection('classmates').where('email', '==', u.email).get();
-            const classes = new Set<string>();
-            snaps.forEach(doc => {
-              const data = doc.data();
-              if (data.classId) classes.add(data.classId);
-            });
-
-            const classList = Array.from(classes);
-            if (classList.length === 1) {
-              // Only one class, auto-select
-              setCurrentClassId(classList[0]);
-              setShowClassSelector(false);
-            } else if (classList.length > 1) {
-              // Multiple classes, show selector
-              setAvailableClasses(classList);
-              setShowClassSelector(true);
-            } else {
-              // No classes found (New User), allow them to enter/join one
-              setAvailableClasses([]);
-              setShowClassSelector(true);
-            }
-          } catch (error) {
-            console.error("Error fetching user classes:", error);
-            setAuthError("Failed to load user profile. Please check your connection.");
-          }
-        }
+        // User is logged in
       } else {
         // Logged out
         setUser(null);
-        setCurrentClassId('');
-        setShowClassSelector(false);
       }
     });
     return () => unsubscribe();
   }, []);
-
-  const handleClassSelection = (classIdToSelect: string) => {
-    if (!classIdToSelect.trim()) {
-        alert("Please enter a valid Class ID.");
-        return;
-    }
-    setCurrentClassId(classIdToSelect.trim());
-    setShowClassSelector(false);
-  };
 
   const handleGuestLogin = () => {
     const guestUser: User = {
@@ -125,12 +76,8 @@ const App: React.FC = () => {
       email: '',
       isAdmin: false,
       role: 'Guest',
-      classId: 'demo' 
     };
     setUser(guestUser);
-    setCurrentClassId('demo'); // Guest gets a demo class ID or read-only view of a public one if we had it. 
-    // For now, let's treat guest as a separate non-persisted session or read from a demo class.
-    // Ideally, Guest should select a class too if public classes existed, but for now we'll mock it.
   };
 
   const handleLogout = async () => {
@@ -140,12 +87,12 @@ const App: React.FC = () => {
   };
 
   // ===============================================================================================
-  // 2. Data Loading (Scoped by currentClassId)
+  // 2. Data Loading
   // ===============================================================================================
 
-  // Fetch User Role/Profile for the selected Class ID
+  // Fetch User Role/Profile
   useEffect(() => {
-    if (!firebaseUser || !currentClassId) return;
+    if (!firebaseUser) return;
 
     let unsubscribe: () => void;
 
@@ -154,22 +101,17 @@ const App: React.FC = () => {
 
       // 1. Check if user is the Super Admin
       if (email === SUPER_ADMIN_EMAIL.toLowerCase()) {
-        // Find existing classmate profile for admin in this class, or create mock
         const adminProfile: User = {
           id: firebaseUser.uid,
           name: firebaseUser.displayName || 'A.E. Beach High C/o 89',
           email: firebaseUser.email!,
           isAdmin: true,
           role: 'Admin',
-          classId: currentClassId
         };
-        // Try to fetch specific details from Firestore if they exist
+        
+        // Try to fetch additional details if they exist in a classmate record
         try {
-           const snapshot = await db.collection('classmates')
-            .where('email', '==', firebaseUser.email)
-            .where('classId', '==', currentClassId)
-            .limit(1).get();
-           
+           const snapshot = await db.collection('classmates').where('email', '==', firebaseUser.email).limit(1).get();
            if (!snapshot.empty) {
                const data = snapshot.docs[0].data();
                adminProfile.address = data.address;
@@ -182,11 +124,10 @@ const App: React.FC = () => {
         return;
       }
 
-      // 2. For regular users, find their Classmate record in this Class ID
+      // 2. For regular users, find their Classmate record
       try {
         unsubscribe = db.collection('classmates')
           .where('email', '==', firebaseUser.email)
-          .where('classId', '==', currentClassId)
           .limit(1)
           .onSnapshot(snapshot => {
             if (!snapshot.empty) {
@@ -207,20 +148,15 @@ const App: React.FC = () => {
                 role: data.role,
                 address: data.address,
                 phone: data.phone,
-                classId: currentClassId
               });
             } else {
-              // User has no profile in this Class ID yet. 
-              // Create a default "Standard" profile for them? 
-              // OR treat them as a new user pending approval?
-              // For this app, we will auto-create a Standard profile if they logged in successfully.
+              // User has no profile yet. Auto-create a Standard profile.
               const newUser: User = {
                 id: firebaseUser.uid,
                 name: firebaseUser.displayName || 'New User',
                 email: firebaseUser.email!,
                 isAdmin: false,
                 role: 'Standard',
-                classId: currentClassId
               };
               setUser(newUser);
             }
@@ -238,15 +174,13 @@ const App: React.FC = () => {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [firebaseUser, currentClassId]);
+  }, [firebaseUser]);
 
 
   // Fetch Transactions
   useEffect(() => {
-    if (!currentClassId) return;
     setIsLoading(true);
     const unsubscribe = db.collection('transactions')
-      .where('classId', '==', currentClassId)
       .onSnapshot((snapshot) => {
         const loadedTransactions = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -257,19 +191,13 @@ const App: React.FC = () => {
       }, (error) => {
         console.error("Error fetching transactions:", error);
         setIsLoading(false);
-        // Only show alert if it's NOT the "offline" error which we suppress
-        if (error.code !== 'unavailable') {
-           // Handle specific errors
-        }
       });
     return () => unsubscribe();
-  }, [currentClassId]);
+  }, []);
 
   // Fetch Classmates
   useEffect(() => {
-    if (!currentClassId) return;
     const unsubscribe = db.collection('classmates')
-      .where('classId', '==', currentClassId)
       .onSnapshot((snapshot) => {
         const loadedClassmates = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -278,59 +206,46 @@ const App: React.FC = () => {
         setClassmates(loadedClassmates);
       }, (error) => console.error("Error fetching classmates:", error));
     return () => unsubscribe();
-  }, [currentClassId]);
+  }, []);
 
   // Fetch Announcements
   useEffect(() => {
-    if (!currentClassId) return;
-    // Note: Previously announcements were in user settings. Now moving to collection for multi-tenancy.
-    // We will query a root 'announcements' collection filtered by classId.
     const unsubscribe = db.collection('announcements')
-      .where('classId', '==', currentClassId)
       .onSnapshot((snapshot) => {
       const loadedAnnouncements = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as Announcement));
-      // Sort client-side for simplicity
+      // Sort client-side
       loadedAnnouncements.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setAnnouncements(loadedAnnouncements);
     });
     return () => unsubscribe();
-  }, [currentClassId]);
+  }, []);
 
-  // Fetch Settings (Logo, Subtitle, Integration) - These might need to be per-class too.
-  // We'll store them in a 'classSettings' collection keyed by classId.
+  // Fetch Settings
   useEffect(() => {
-      if (!currentClassId) return;
-      const docRef = db.collection('classSettings').doc(currentClassId);
-      
+      const docRef = db.collection('settings').doc('general');
       const unsubscribe = docRef.onSnapshot(doc => {
           if (doc.exists) {
               const data = doc.data();
               if (data?.logo) setLogo(data.logo);
               if (data?.subtitle) setSubtitle(data.subtitle);
               if (data?.integrationSettings) setIntegrationSettings(data.integrationSettings);
-          } else {
-              // Defaults if no settings exist yet
-              setLogo('https://via.placeholder.com/150');
-              setSubtitle('Alumni Bookkeeping');
           }
       });
       return () => unsubscribe();
-  }, [currentClassId]);
+  }, []);
 
 
   // ===============================================================================================
   // 3. Data Mutation Functions
   // ===============================================================================================
 
-  const addTransaction = async (transaction: Omit<Transaction, 'id' | 'classId'>) => {
+  const addTransaction = async (transaction: Omit<Transaction, 'id'>) => {
     try {
-      if (!currentClassId) throw new Error("No Class ID selected");
-      const docRef = await db.collection('transactions').add({
+      await db.collection('transactions').add({
           ...transaction,
-          classId: currentClassId
       });
       
       // Auto-create/update classmate profile
@@ -340,7 +255,6 @@ const App: React.FC = () => {
               name: transaction.classmateName,
               role: 'Standard',
               status: 'Active',
-              classId: currentClassId
           });
       }
     } catch (error) {
@@ -354,12 +268,11 @@ const App: React.FC = () => {
       await db.collection('transactions').doc(updatedTransaction.id).update(updatedTransaction);
        // Check if name changed and update classmate list if it's a new name
        const existingClassmate = classmates.find(c => c.name.toLowerCase() === updatedTransaction.classmateName.toLowerCase());
-       if (!existingClassmate && currentClassId) {
+       if (!existingClassmate) {
            await db.collection('classmates').add({
                name: updatedTransaction.classmateName,
                role: 'Standard',
                status: 'Active',
-               classId: currentClassId
            });
        }
     } catch (error) {
@@ -419,12 +332,10 @@ const App: React.FC = () => {
     }
   };
 
-  const addAnnouncement = async (announcement: Omit<Announcement, 'id' | 'date' | 'classId'>) => {
+  const addAnnouncement = async (announcement: Omit<Announcement, 'id' | 'date'>) => {
     try {
-      if (!currentClassId) throw new Error("No Class ID");
       await db.collection('announcements').add({
         ...announcement,
-        classId: currentClassId,
         date: new Date().toISOString()
       });
     } catch (error) {
@@ -443,9 +354,8 @@ const App: React.FC = () => {
   };
 
   const updateSettings = async (field: string, value: any) => {
-      if (!currentClassId) return;
       try {
-          const ref = db.collection('classSettings').doc(currentClassId);
+          const ref = db.collection('settings').doc('general');
           await ref.set({ [field]: value }, { merge: true });
           
           if (field === 'logo') setLogo(value);
@@ -456,10 +366,9 @@ const App: React.FC = () => {
   };
 
   const updateIntegrationSettings = async (service: keyof IntegrationSettings, settings: IntegrationService) => {
-    if (!currentClassId) return;
     try {
         const newSettings = { ...integrationSettings, [service]: settings };
-        const ref = db.collection('classSettings').doc(currentClassId);
+        const ref = db.collection('settings').doc('general');
         await ref.set({ integrationSettings: newSettings }, { merge: true });
         setIntegrationSettings(newSettings);
     } catch (error) {
@@ -468,13 +377,7 @@ const App: React.FC = () => {
   };
   
   const updateUserProfile = async (data: Partial<User>) => {
-    if (!user || !currentClassId) return;
-    
-    // Determine the ID of the classmate document to update.
-    // If user.id is 'guest', we don't save.
-    // If user.id matches the auth uid, we might need to find the corresponding classmate doc if it's separate.
-    // In our logic above, we set user.id to the Classmate Doc ID for regular users.
-    // For Admin (dues_...), we need to find their doc or create one.
+    if (!user) return;
     
     let docId = user.id;
 
@@ -482,7 +385,6 @@ const App: React.FC = () => {
     if (user.isAdmin && user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
         const snapshot = await db.collection('classmates')
             .where('email', '==', user.email)
-            .where('classId', '==', currentClassId)
             .limit(1).get();
         if (snapshot.empty) {
             const newDoc = await db.collection('classmates').add({
@@ -490,7 +392,6 @@ const App: React.FC = () => {
                 email: user.email,
                 role: 'Admin',
                 status: 'Active',
-                classId: currentClassId,
                 address: data.address,
                 phone: data.phone
             });
@@ -514,7 +415,6 @@ const App: React.FC = () => {
         if (data.name && data.name !== user.name) {
              const batch = db.batch();
              const txSnapshot = await db.collection('transactions')
-                .where('classId', '==', currentClassId)
                 .where('classmateName', '==', user.name).get();
              
              txSnapshot.docs.forEach(doc => {
@@ -532,9 +432,8 @@ const App: React.FC = () => {
   };
 
   const uploadTransactionAttachment = async (file: File): Promise<string> => {
-      if (!currentClassId) throw new Error("No class ID");
       const storageRef = storage.ref();
-      const fileRef = storageRef.child(`${currentClassId}/receipts/${Date.now()}_${file.name}`);
+      const fileRef = storageRef.child(`receipts/${Date.now()}_${file.name}`);
       await fileRef.put(file);
       return await fileRef.getDownloadURL();
   };
@@ -566,9 +465,6 @@ const App: React.FC = () => {
   const deleteClassmates = async (classmateIds: string[]): Promise<string | null> => {
       try {
           // Verify no transactions exist for these classmates
-          // This is a bit complex in bulk, so we'll check individually or rely on UI to be safe.
-          // For safety, we will prevent deletion if ANY transactions match the names.
-          
           // Fetch names first
           const toDeleteRefs = classmateIds.map(id => db.collection('classmates').doc(id));
           const toDeleteSnaps = await Promise.all(toDeleteRefs.map(ref => ref.get()));
@@ -577,7 +473,6 @@ const App: React.FC = () => {
           // Check transactions (simple check, expensive if many)
           for (const name of namesToCheck) {
               const txSnap = await db.collection('transactions')
-                  .where('classId', '==', currentClassId)
                   .where('classmateName', '==', name).limit(1).get();
               if (!txSnap.empty) {
                   return `Cannot delete classmate '${name}' because they have associated transactions. Please re-assign or delete transactions first.`;
@@ -608,7 +503,6 @@ const App: React.FC = () => {
           // 1. Update transactions for each source name
           for (const sourceName of sourceNames) {
               const txSnap = await db.collection('transactions')
-                  .where('classId', '==', currentClassId)
                   .where('classmateName', '==', sourceName).get();
               txSnap.docs.forEach(doc => {
                   batch.update(doc.ref, { classmateName: targetName });
@@ -628,10 +522,9 @@ const App: React.FC = () => {
   };
 
   const reconcileDuplicateClassmates = async () => {
-    if (!currentClassId) return;
     try {
       // 1. Fetch all classmates
-      const snapshot = await db.collection('classmates').where('classId', '==', currentClassId).get();
+      const snapshot = await db.collection('classmates').get();
       const allCms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classmate));
 
       // 2. Group by normalized name
@@ -659,8 +552,6 @@ const App: React.FC = () => {
           const primary = group[0];
           const duplicates = group.slice(1).map(c => c.id);
           
-          // Call merge logic (we have to do this carefully in a loop or batch)
-          // Since mergeClassmates handles batching internally, we can await it.
           updates.push(mergeClassmates(primary.id, duplicates));
         }
       });
@@ -672,35 +563,6 @@ const App: React.FC = () => {
       console.error("Error reconciling:", error);
       alert("Error during reconciliation.");
     }
-  };
-
-  // NEW: Migrate Legacy Data
-  const migrateLegacyData = async (): Promise<number> => {
-      if (!currentClassId) return 0;
-      
-      let totalMigrated = 0;
-      const collections = ['transactions', 'announcements', 'classmates'];
-      
-      for (const colName of collections) {
-          const snapshot = await db.collection(colName).get();
-          const batch = db.batch();
-          let batchCount = 0;
-          
-          snapshot.docs.forEach(doc => {
-              const data = doc.data();
-              // If classId is undefined, null, or empty string, migrate it
-              if (!data.classId) {
-                  batch.update(doc.ref, { classId: currentClassId });
-                  batchCount++;
-                  totalMigrated++;
-              }
-          });
-          
-          if (batchCount > 0) {
-              await batch.commit();
-          }
-      }
-      return totalMigrated;
   };
 
 
@@ -719,7 +581,6 @@ const App: React.FC = () => {
     );
   }
 
-  // State: Not Logged In
   if (!user && !firebaseUser) {
      return (
         <>
@@ -729,59 +590,7 @@ const App: React.FC = () => {
      );
   }
 
-  // State: Logged In but selecting Class
-  if (showClassSelector) {
-      return (
-          <div className="min-h-screen bg-brand-background flex items-center justify-center p-4">
-              <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
-                  <h2 className="text-2xl font-bold text-center text-brand-primary mb-6">Select Your Class</h2>
-                  
-                  {availableClasses.length > 0 && (
-                      <div className="space-y-3 mb-6">
-                          <p className="text-sm text-gray-600 text-center">You are a member of multiple classes:</p>
-                          {availableClasses.map(cls => (
-                              <button 
-                                key={cls} 
-                                onClick={() => handleClassSelection(cls)}
-                                className="w-full p-3 bg-gray-50 border hover:bg-brand-accent hover:text-white rounded-md transition-colors font-medium"
-                              >
-                                  {cls}
-                              </button>
-                          ))}
-                      </div>
-                  )}
-
-                  <div className="border-t pt-6">
-                      <p className="text-sm text-gray-600 mb-2">
-                          {availableClasses.length > 0 ? "Or enter a different Class ID:" : "Please enter your Class ID to continue:"}
-                      </p>
-                      <div className="flex gap-2">
-                          <input 
-                              type="text" 
-                              value={classInput} 
-                              onChange={(e) => setClassInput(e.target.value)} 
-                              placeholder="e.g. BEACH89"
-                              className="flex-grow border-gray-300 rounded-md shadow-sm"
-                          />
-                          <button 
-                              onClick={() => handleClassSelection(classInput)}
-                              className="bg-brand-primary text-white px-4 py-2 rounded-md hover:bg-brand-secondary"
-                          >
-                              Go
-                          </button>
-                      </div>
-                  </div>
-                  
-                  <div className="mt-6 text-center">
-                    <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-gray-800 underline">Logout</button>
-                  </div>
-              </div>
-          </div>
-      );
-  }
-
-  // State: Loading User Profile (Logged in, Class Selected, but Data not ready)
-  if (firebaseUser && !user && !showClassSelector) {
+  if (firebaseUser && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-brand-background">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div>
@@ -789,12 +598,9 @@ const App: React.FC = () => {
     );
   }
 
-  // State: Logged In & Class Selected
   return (
     <DataProvider value={{
       user,
-      currentClassId,
-      setCurrentClassId: handleClassSelection,
       logo,
       setLogo: (val) => updateSettings('logo', val),
       subtitle,
@@ -819,11 +625,9 @@ const App: React.FC = () => {
       mergeClassmates,
       deleteClassmates,
       updateClassmatesStatus,
-      reconcileDuplicateClassmates,
-      migrateLegacyData
+      reconcileDuplicateClassmates
     }}>
       <div className="min-h-screen bg-brand-background flex flex-col lg:flex-row">
-        {/* Mobile Header for Nav Toggle is inside Sidebar component, but we need structure */}
         <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} onLogout={handleLogout} />
 
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">

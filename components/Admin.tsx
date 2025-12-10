@@ -14,7 +14,7 @@ type BulkEditData = {
 
 const Admin: React.FC = () => {
   const { 
-    user, currentClassId, migrateLegacyData,
+    user,
     transactions, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, 
     logo, setLogo, subtitle, setSubtitle, integrationSettings, updateIntegrationSettings,
     announcements, addAnnouncement, deleteAnnouncement, uploadTransactionAttachment
@@ -29,9 +29,8 @@ const Admin: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importStatus, setImportStatus] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
-  const [migrationStatus, setMigrationStatus] = useState<string>('');
 
-  const [newTransaction, setNewTransaction] = useState<Omit<Transaction, 'id' | 'classId'>>({
+  const [newTransaction, setNewTransaction] = useState<Omit<Transaction, 'id'>>({
     date: new Date().toISOString().split('T')[0],
     classmateName: '',
     amount: 0,
@@ -251,7 +250,7 @@ const Admin: React.FC = () => {
                 throw new Error("Unsupported file type. Please upload a CSV or Excel file.");
             }
 
-            const newTransactions: Omit<Transaction, 'id' | 'classId'>[] = [];
+            const newTransactions: Omit<Transaction, 'id'>[] = [];
             const header = Object.keys(jsonData[0] || {}).map(h => h.toLowerCase().replace(/\s+/g, ''));
             
             const findHeader = (possibleNames: string[]) => {
@@ -287,7 +286,7 @@ const Admin: React.FC = () => {
                 const paymentTypeStr = paymentTypeKey && row[paymentTypeKey] ? String(row[paymentTypeKey]).trim().toLowerCase() : '';
                 const matchedPaymentType = Object.values(PaymentType).find(pt => pt.toLowerCase() === paymentTypeStr);
 
-                const newTx: Omit<Transaction, 'id' | 'classId'> = {
+                const newTx: Omit<Transaction, 'id'> = {
                     date: date || new Date().toISOString().split('T')[0],
                     classmateName: nameKey ? String(row[nameKey] || 'N/A') : 'N/A',
                     amount: amount,
@@ -437,7 +436,7 @@ const Admin: React.FC = () => {
   const handleAddAnnouncement = (e: React.FormEvent) => {
     e.preventDefault();
     if(newAnnouncement.title && (newAnnouncement.content || newAnnouncement.url)) {
-      const announcementToAdd: Omit<Announcement, 'id' | 'date' | 'classId'> = {
+      const announcementToAdd: Omit<Announcement, 'id' | 'date'> = {
         title: newAnnouncement.title,
         content: newAnnouncement.content,
         type: newAnnouncement.type,
@@ -469,19 +468,6 @@ const Admin: React.FC = () => {
       });
       alert('Integration settings saved!');
   };
-
-  const handleMigration = async () => {
-    if (window.confirm(`This will find all existing records (transactions, classmates, announcements) that do NOT have a Class ID and assign them to your current Class ID: "${currentClassId}". This is useful for migrating old data. Continue?`)) {
-      setMigrationStatus('Migrating data...');
-      try {
-        const count = await migrateLegacyData();
-        setMigrationStatus(`Success! Migrated ${count} records to Class ID: ${currentClassId}.`);
-      } catch (err) {
-        setMigrationStatus('Error during migration.');
-        console.error(err);
-      }
-    }
-  }
 
   const selectAllRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -638,26 +624,6 @@ const Admin: React.FC = () => {
 
         {/* Right Column */}
         <div className="space-y-8">
-
-          {/* Class ID Management */}
-          <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-indigo-500">
-             <h3 className="text-xl font-semibold mb-2">Class Management</h3>
-             <p className="text-sm text-gray-600 mb-4">Current Class ID: <span className="font-mono bg-gray-100 px-2 py-1 rounded font-bold">{currentClassId}</span></p>
-             
-             {!isReadOnly && (
-             <div className="mt-4">
-               <h4 className="font-medium text-gray-800 text-sm mb-2">Data Migration</h4>
-               <p className="text-xs text-gray-500 mb-2">Use this if you have old data that isn't showing up because it lacks a Class ID.</p>
-               <button 
-                 onClick={handleMigration} 
-                 className="w-full bg-indigo-500 text-white py-2 px-4 rounded-md hover:bg-indigo-600 text-sm"
-                >
-                  Migrate Legacy Data to {currentClassId}
-               </button>
-               {migrationStatus && <p className="mt-2 text-xs font-semibold text-indigo-700">{migrationStatus}</p>}
-             </div>
-             )}
-          </div>
 
           {/* Manually Enter Transaction */}
           {!isReadOnly && (

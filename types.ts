@@ -27,7 +27,6 @@ export enum PaymentType {
 
 export interface Transaction {
   id: string;
-  classId: string; // New field for multi-tenancy
   date: string;
   description: string;
   category: PaymentCategory;
@@ -41,7 +40,6 @@ export interface Transaction {
 
 export interface Announcement {
   id: string;
-  classId: string; // New field for multi-tenancy
   title: string;
   content: string;
   date: string;
@@ -60,12 +58,10 @@ export interface User {
   role: UserRole;
   address?: string;
   phone?: string;
-  classId?: string;
 }
 
 export interface Classmate {
     id: string;
-    classId: string; // New field for multi-tenancy
     name: string;
     role: UserRole;
     email?: string;
@@ -88,21 +84,19 @@ export interface IntegrationSettings {
 
 export interface DataContextType {
   user: User | null;
-  currentClassId: string;
-  setCurrentClassId: (classId: string) => void;
   logo: string;
   setLogo: (logoUpdater: string | ((prevLogo: string) => string)) => Promise<void>;
   subtitle: string;
   setSubtitle: (subtitleUpdater: string | ((prevSubtitle: string) => string)) => Promise<void>;
   transactions: Transaction[];
-  addTransaction: (transaction: Omit<Transaction, 'id' | 'classId'>) => Promise<void>;
+  addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<void>;
   updateTransaction: (updatedTransaction: Transaction) => Promise<void>;
   updateTransactions: (updatedTransactions: Transaction[]) => Promise<void>;
   deleteTransaction: (transactionId: string) => Promise<void>;
   deleteTransactions: (transactionIds: string[]) => Promise<void>;
   clearTransactions: () => Promise<void>;
   announcements: Announcement[];
-  addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date' | 'classId'>) => Promise<void>;
+  addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date'>) => Promise<void>;
   deleteAnnouncement: (announcementId: string) => Promise<void>;
   classBalance: number;
   integrationSettings: IntegrationSettings;
@@ -115,5 +109,4 @@ export interface DataContextType {
   deleteClassmates: (classmateIds: string[]) => Promise<string | null>;
   updateClassmatesStatus: (classmateIds: string[], status: 'Active' | 'Inactive') => Promise<void>;
   reconcileDuplicateClassmates: () => Promise<void>;
-  migrateLegacyData: () => Promise<number>; // New function to migrate data without classId
 }
