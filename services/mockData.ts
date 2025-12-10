@@ -1,3 +1,4 @@
+
 import { PaymentCategory, Transaction, PaymentType } from '../types';
 
 const classmates = [
@@ -30,6 +31,7 @@ export const generateMockTransactions = (): Transaction[] => {
     const transaction: Transaction = {
       // Fix: The transaction ID must be a string. Converted the number `i` to a string.
       id: i.toString(),
+      classId: 'demo',
       date: randomDate.toISOString().split('T')[0],
       description: `${category} Payment`,
       category: category,
