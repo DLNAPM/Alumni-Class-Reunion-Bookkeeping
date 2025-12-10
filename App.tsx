@@ -64,8 +64,9 @@ const App: React.FC = () => {
       setAuthError(null);
 
       if (u) {
+        const email = u.email?.toLowerCase() || '';
         // User is logged in. Now determine Class ID context.
-        if (u.email === SUPER_ADMIN_EMAIL) {
+        if (email === SUPER_ADMIN_EMAIL.toLowerCase()) {
           // Super Admin: Can enter any class ID.
           setAvailableClasses([]);
           setShowClassSelector(true);
@@ -149,8 +150,10 @@ const App: React.FC = () => {
     let unsubscribe: () => void;
 
     const fetchUserProfile = async () => {
+      const email = firebaseUser.email?.toLowerCase() || '';
+
       // 1. Check if user is the Super Admin
-      if (firebaseUser.email === SUPER_ADMIN_EMAIL) {
+      if (email === SUPER_ADMIN_EMAIL.toLowerCase()) {
         // Find existing classmate profile for admin in this class, or create mock
         const adminProfile: User = {
           id: firebaseUser.uid,
@@ -476,7 +479,7 @@ const App: React.FC = () => {
     let docId = user.id;
 
     // Handle Admin Logic: Find or Create doc for Super Admin
-    if (user.isAdmin && user.email === SUPER_ADMIN_EMAIL) {
+    if (user.isAdmin && user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
         const snapshot = await db.collection('classmates')
             .where('email', '==', user.email)
             .where('classId', '==', currentClassId)
@@ -775,6 +778,15 @@ const App: React.FC = () => {
               </div>
           </div>
       );
+  }
+
+  // State: Loading User Profile (Logged in, Class Selected, but Data not ready)
+  if (firebaseUser && !user && !showClassSelector) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-brand-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div>
+      </div>
+    );
   }
 
   // State: Logged In & Class Selected
