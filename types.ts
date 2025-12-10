@@ -27,6 +27,7 @@ export enum PaymentType {
 
 export interface Transaction {
   id: string;
+  classId: string;
   date: string;
   description: string;
   category: PaymentCategory;
@@ -40,6 +41,7 @@ export interface Transaction {
 
 export interface Announcement {
   id: string;
+  classId: string;
   title: string;
   content: string;
   date: string;
@@ -62,6 +64,7 @@ export interface User {
 
 export interface Classmate {
     id: string;
+    classId: string;
     name: string;
     role: UserRole;
     email?: string;
@@ -83,20 +86,22 @@ export interface IntegrationSettings {
 }
 
 export interface DataContextType {
+  currentClassId: string;
+  migrateLegacyData: () => Promise<void>;
   user: User | null;
   logo: string;
   setLogo: (logoUpdater: string | ((prevLogo: string) => string)) => Promise<void>;
   subtitle: string;
   setSubtitle: (subtitleUpdater: string | ((prevSubtitle: string) => string)) => Promise<void>;
   transactions: Transaction[];
-  addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<void>;
+  addTransaction: (transaction: Omit<Transaction, 'id' | 'classId'>) => Promise<void>;
   updateTransaction: (updatedTransaction: Transaction) => Promise<void>;
   updateTransactions: (updatedTransactions: Transaction[]) => Promise<void>;
   deleteTransaction: (transactionId: string) => Promise<void>;
   deleteTransactions: (transactionIds: string[]) => Promise<void>;
   clearTransactions: () => Promise<void>;
   announcements: Announcement[];
-  addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date'>) => Promise<void>;
+  addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date' | 'classId'>) => Promise<void>;
   deleteAnnouncement: (announcementId: string) => Promise<void>;
   classBalance: number;
   integrationSettings: IntegrationSettings;
@@ -104,7 +109,7 @@ export interface DataContextType {
   updateUserProfile: (data: Partial<User>) => Promise<void>;
   uploadTransactionAttachment: (file: File) => Promise<string>;
   classmates: Classmate[];
-  updateClassmate: (id: string, updatedData: Partial<Omit<Classmate, 'id'>>) => Promise<void>;
+  updateClassmate: (id: string, updatedData: Partial<Omit<Classmate, 'id' | 'classId'>>) => Promise<void>;
   mergeClassmates: (targetClassmateId: string, sourceClassmateIds: string[]) => Promise<void>;
   deleteClassmates: (classmateIds: string[]) => Promise<string | null>;
   updateClassmatesStatus: (classmateIds: string[], status: 'Active' | 'Inactive') => Promise<void>;

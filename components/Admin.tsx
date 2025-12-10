@@ -15,6 +15,7 @@ type BulkEditData = {
 const Admin: React.FC = () => {
   const { 
     user,
+    currentClassId, migrateLegacyData,
     transactions, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, 
     logo, setLogo, subtitle, setSubtitle, integrationSettings, updateIntegrationSettings,
     announcements, addAnnouncement, deleteAnnouncement, uploadTransactionAttachment
@@ -30,7 +31,7 @@ const Admin: React.FC = () => {
   const [importStatus, setImportStatus] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
 
-  const [newTransaction, setNewTransaction] = useState<Omit<Transaction, 'id'>>({
+  const [newTransaction, setNewTransaction] = useState<Omit<Transaction, 'id' | 'classId'>>({
     date: new Date().toISOString().split('T')[0],
     classmateName: '',
     amount: 0,
@@ -250,7 +251,7 @@ const Admin: React.FC = () => {
                 throw new Error("Unsupported file type. Please upload a CSV or Excel file.");
             }
 
-            const newTransactions: Omit<Transaction, 'id'>[] = [];
+            const newTransactions: Omit<Transaction, 'id' | 'classId'>[] = [];
             const header = Object.keys(jsonData[0] || {}).map(h => h.toLowerCase().replace(/\s+/g, ''));
             
             const findHeader = (possibleNames: string[]) => {
@@ -286,7 +287,7 @@ const Admin: React.FC = () => {
                 const paymentTypeStr = paymentTypeKey && row[paymentTypeKey] ? String(row[paymentTypeKey]).trim().toLowerCase() : '';
                 const matchedPaymentType = Object.values(PaymentType).find(pt => pt.toLowerCase() === paymentTypeStr);
 
-                const newTx: Omit<Transaction, 'id'> = {
+                const newTx: Omit<Transaction, 'id' | 'classId'> = {
                     date: date || new Date().toISOString().split('T')[0],
                     classmateName: nameKey ? String(row[nameKey] || 'N/A') : 'N/A',
                     amount: amount,
@@ -436,7 +437,7 @@ const Admin: React.FC = () => {
   const handleAddAnnouncement = (e: React.FormEvent) => {
     e.preventDefault();
     if(newAnnouncement.title && (newAnnouncement.content || newAnnouncement.url)) {
-      const announcementToAdd: Omit<Announcement, 'id' | 'date'> = {
+      const announcementToAdd: Omit<Announcement, 'id' | 'date' | 'classId'> = {
         title: newAnnouncement.title,
         content: newAnnouncement.content,
         type: newAnnouncement.type,
@@ -469,6 +470,13 @@ const Admin: React.FC = () => {
       alert('Integration settings saved!');
   };
 
+  const handleMigrateLegacyData = async () => {
+      if (!currentClassId) return;
+      if (window.confirm(`This will assign all data without a Class ID to the current class: '${currentClassId}'. This action is intended for initial setup or migration. Continue?`)) {
+          await migrateLegacyData();
+      }
+  };
+
   const selectAllRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (selectAllRef.current) {
@@ -486,6 +494,22 @@ const Admin: React.FC = () => {
         
         {/* Left Column */}
         <div className="lg:col-span-2 space-y-8">
+          {/* Class Management (New Section) */}
+          {!isReadOnly && (
+          <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-indigo-500">
+            <h3 className="text-xl font-semibold mb-2">Class Management</h3>
+            <p className="text-sm text-gray-600 mb-4">
+                Current Class ID: <span className="font-mono bg-gray-100 px-2 py-1 rounded font-bold">{currentClassId}</span>
+            </p>
+            <button onClick={handleMigrateLegacyData} className="bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 text-sm">
+                Migrate Legacy Data
+            </button>
+            <p className="text-xs text-gray-500 mt-2">
+                Use this to assign older records (with no Class ID) to the current class.
+            </p>
+          </div>
+          )}
+
           {/* Manage All Transactions */}
           <div className="bg-white p-6 rounded-lg shadow-md">
             <div className="sm:flex sm:items-center sm:justify-between mb-4">
