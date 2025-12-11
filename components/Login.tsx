@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { auth, googleProvider } from '../firebase';
 
@@ -10,59 +11,174 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin, onHelpClick }) => {
 
   const handleSignInClick = async () => {
     try {
-      // Fix: Use v8 SDK syntax for signInWithPopup.
       await auth.signInWithPopup(googleProvider);
-      // onAuthStateChanged in App.tsx will handle login and navigation
     } catch (error) {
       console.error("Error signing in with Google:", error);
       alert("An error occurred during sign-in. Please try again.");
     }
   };
-  
+
   return (
-    <div className="min-h-screen bg-brand-background flex items-center justify-center p-4">
-        <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl p-8 text-center">
-            <button
-                onClick={onHelpClick}
-                className="absolute top-4 right-4 p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-brand-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary"
-                aria-label="Help"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.546-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            </button>
-             <svg className="mx-auto h-12 w-auto text-brand-secondary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+    <div className="min-h-screen bg-white flex flex-col font-sans text-brand-text">
+      {/* Navigation */}
+      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-6 flex justify-between items-center">
+        <div className="flex items-center gap-2">
+            <svg className="h-8 w-8 text-brand-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01M12 6v-1m0-1V4m0 2.01V5M12 20v-1m0-1v-1m0-1v-1m0-1v-1m0-1v-1m0-1v-1m0-1v-1" />
             </svg>
-            <h2 className="mt-6 text-3xl font-extrabold text-brand-text">Alumni Bookkeeping</h2>
-            <p className="mt-2 text-sm text-gray-600">Welcome! Sign in to continue.</p>
-            <button
-                onClick={handleSignInClick}
-                className="mt-8 w-full inline-flex justify-center items-center py-3 px-5 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-                <svg className="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48px" height="48px">
-                    <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
-                    <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
-                    <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.222,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
-                    <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.904,36.213,44,30.606,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
-                </svg>
-                Sign in with Google
-            </button>
-            <div className="mt-6 relative">
-                <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-300"></div>
+            <span className="text-2xl font-bold text-gray-900 tracking-tight">Alumni Bookkeeping</span>
+        </div>
+        <button
+            onClick={onHelpClick}
+            className="text-gray-500 hover:text-brand-primary font-medium transition-colors"
+        >
+            About
+        </button>
+      </nav>
+
+      {/* Hero Section */}
+      <main className="flex-grow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-24 lg:pt-32">
+            <div className="lg:grid lg:grid-cols-12 lg:gap-8">
+                <div className="sm:text-center md:max-w-2xl md:mx-auto lg:col-span-6 lg:text-left">
+                    <h1 className="text-4xl tracking-tight font-extrabold text-gray-900 sm:text-5xl md:text-6xl">
+                        <span className="block xl:inline">Modern Finance for</span>{' '}
+                        <span className="block text-brand-primary xl:inline">Alumni Classes</span>
+                    </h1>
+                    <p className="mt-3 text-base text-gray-500 sm:mt-5 sm:text-lg sm:max-w-xl sm:mx-auto md:mt-5 md:text-xl lg:mx-0">
+                        Simplify dues collection, track expenses transparency, and keep your classmates connected. The professional ledger built for your reunion committee.
+                    </p>
+                    <div className="mt-8 sm:max-w-lg sm:mx-auto sm:text-center lg:text-left lg:mx-0">
+                         <div className="space-y-4">
+                            <button
+                                onClick={handleSignInClick}
+                                className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-brand-primary hover:bg-brand-secondary md:py-4 md:text-lg md:px-10 shadow-lg hover:shadow-xl transition-all"
+                            >
+                                <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
+                                    <path fill="currentColor" d="M21.35,11.1H12.18V13.83H18.69C18.36,17.64 15.19,19.27 12.19,19.27C8.36,19.27 5,16.25 5,12C5,7.9 8.2,4.73 12.2,4.73C15.29,4.73 17.1,6.7 17.1,6.7L19,4.72C19,4.72 16.56,2 12.1,2C6.42,2 2.03,6.8 2.03,12C2.03,17.05 6.16,22 12.25,22C17.6,22 21.5,18.33 21.5,12.91C21.5,11.76 21.35,11.1 21.35,11.1V11.1Z" />
+                                </svg>
+                                Sign in with Google
+                            </button>
+                             <button
+                                onClick={onGuestLogin}
+                                className="w-full flex items-center justify-center px-8 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 md:py-4 md:text-lg md:px-10"
+                            >
+                                Continue as Guest
+                            </button>
+                        </div>
+                         <p className="mt-3 text-sm text-gray-400">
+                            Secure access via Google Authentication.
+                        </p>
+                    </div>
                 </div>
-                <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white text-gray-500">Or</span>
+                <div className="mt-12 relative sm:max-w-lg sm:mx-auto lg:mt-0 lg:max-w-none lg:mx-0 lg:col-span-6 lg:flex lg:items-center">
+                    <div className="relative mx-auto w-full rounded-lg shadow-lg lg:max-w-md">
+                        <div className="relative block w-full bg-white rounded-lg overflow-hidden">
+                             <img
+                                className="w-full"
+                                src="https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1000&q=80"
+                                alt="Financial Dashboard"
+                            />
+                             <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent opacity-40"></div>
+                             <div className="absolute bottom-0 left-0 p-6">
+                                 <p className="text-white font-semibold text-lg">Transparent Financials</p>
+                                 <p className="text-gray-200 text-sm">Real-time reporting for every classmate.</p>
+                             </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <button
-                onClick={onGuestLogin}
-                className="mt-6 w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                >
-                Continue as a Guest
-            </button>
         </div>
+
+        {/* Feature Sections */}
+        <div className="bg-gray-50 py-16 sm:py-24">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="text-center">
+                    <h2 className="text-base font-semibold text-brand-primary tracking-wide uppercase">Features</h2>
+                    <p className="mt-1 text-3xl font-extrabold text-gray-900 sm:text-4xl sm:tracking-tight">
+                        Everything you need to manage your class.
+                    </p>
+                </div>
+
+                <div className="mt-16">
+                    <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+                        {/* Feature 1 */}
+                        <div className="pt-6">
+                            <div className="flow-root bg-white rounded-lg px-6 pb-8">
+                                <div className="-mt-6">
+                                    <div>
+                                        <span className="inline-flex items-center justify-center p-3 bg-brand-primary rounded-md shadow-lg">
+                                            <svg className="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 3.666V14h-6v-3.334H5V18h14v-7.334h-2.999V7H15zM9 7H6v3.334h3V7z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" />
+                                            </svg>
+                                        </span>
+                                    </div>
+                                    <h3 className="mt-8 text-lg font-medium text-gray-900 tracking-tight">Classmate Management</h3>
+                                    <p className="mt-5 text-base text-gray-500">
+                                        Maintain an up-to-date directory of all classmates. Track contact info, roles, and status in one secure place.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Feature 2 */}
+                        <div className="pt-6">
+                             <div className="flow-root bg-white rounded-lg px-6 pb-8">
+                                <div className="-mt-6">
+                                    <div>
+                                        <span className="inline-flex items-center justify-center p-3 bg-brand-primary rounded-md shadow-lg">
+                                            <svg className="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01M12 6v-1m0-1V4m0 2.01V5M12 20v-1m0-1v-1m0-1v-1m0-1v-1m0-1v-1m0-1v-1m0-1v-1" />
+                                            </svg>
+                                        </span>
+                                    </div>
+                                    <h3 className="mt-8 text-lg font-medium text-gray-900 tracking-tight">Financial Tracking</h3>
+                                    <p className="mt-5 text-base text-gray-500">
+                                        Record dues, donations, and expenses with ease. Generate transparent reports so everyone knows how funds are used.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Feature 3 */}
+                        <div className="pt-6">
+                             <div className="flow-root bg-white rounded-lg px-6 pb-8">
+                                <div className="-mt-6">
+                                    <div>
+                                        <span className="inline-flex items-center justify-center p-3 bg-brand-primary rounded-md shadow-lg">
+                                             <svg className="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                            </svg>
+                                        </span>
+                                    </div>
+                                    <h3 className="mt-8 text-lg font-medium text-gray-900 tracking-tight">Events & Announcements</h3>
+                                    <p className="mt-5 text-base text-gray-500">
+                                        Keep the class informed about reunions, picnics, and fundraisers. Embed Facebook posts or create custom announcements.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+      </main>
+      
+      {/* Footer */}
+      <footer className="bg-white">
+          <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 md:flex md:items-center md:justify-between lg:px-8 border-t border-gray-200">
+            <div className="flex justify-center space-x-6 md:order-2">
+                <span className="text-gray-400 hover:text-gray-500 cursor-pointer">Privacy Policy</span>
+                <span className="text-gray-400 hover:text-gray-500 cursor-pointer">Terms of Service</span>
+            </div>
+            <div className="mt-8 md:mt-0 md:order-1">
+                <p className="text-center text-base text-gray-400">
+                &copy; {new Date().getFullYear()} Alumni Bookkeeping App. All rights reserved.
+                </p>
+            </div>
+          </div>
+      </footer>
     </div>
   );
 };
