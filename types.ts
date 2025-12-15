@@ -88,6 +88,7 @@ export interface IntegrationSettings {
 export interface DataContextType {
   currentClassId: string;
   migrateLegacyData: () => Promise<void>;
+  deleteClassLedger: () => Promise<void>;
   user: User | null;
   logo: string;
   setLogo: (logoUpdater: string | ((prevLogo: string) => string)) => Promise<void>;

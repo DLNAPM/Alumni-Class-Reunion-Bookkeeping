@@ -14,6 +14,7 @@ import Classmates from './components/Classmates';
 import HelpModal from './components/HelpModal';
 import { auth, db, storage, FirebaseUser, Timestamp } from './firebase';
 import type { User, Transaction, Announcement, IntegrationSettings, IntegrationService, Classmate, UserRole } from './types';
+import firebase from 'firebase/compat/app';
 
 // Hardcoded Super Admin Email
 const SUPER_ADMIN_EMAIL = 'dues_beachhigh89@comcast.net';
@@ -102,10 +103,26 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleClassSelection = (selectedId: string) => {
-      if (selectedId && selectedId.trim().length > 0) {
-          setCurrentClassId(selectedId.trim());
+  const handleClassSelection = async (selectedId: string) => {
+      const id = selectedId?.trim();
+      if (!id) return;
+
+      try {
+          // Check if class exists by looking for any classmates associated with it
+          const snapshot = await db.collection('classmates').where('classId', '==', id).limit(1).get();
+          
+          if (snapshot.empty) {
+              const confirmCreate = window.confirm(`Class ID '${id}' does not exist.\n\nDo you want to create a new Class Ledger with ID '${id}' and become the Administrator?`);
+              if (!confirmCreate) {
+                  return;
+              }
+          }
+
+          setCurrentClassId(id);
           setIsSelectingClass(false);
+      } catch (error) {
+          console.error("Error checking class existence:", error);
+          alert("An error occurred while checking Class ID. Please try again.");
       }
   };
 
@@ -174,7 +191,7 @@ const App: React.FC = () => {
           .where('email', '==', firebaseUser.email)
           .where('classId', '==', currentClassId)
           .limit(1)
-          .onSnapshot(snapshot => {
+          .onSnapshot(async (snapshot) => {
             if (!snapshot.empty) {
               const doc = snapshot.docs[0];
               const data = doc.data() as Classmate;
@@ -195,15 +212,34 @@ const App: React.FC = () => {
                 phone: data.phone,
               });
             } else {
-              // User has no profile in this class yet. Auto-create a Standard profile.
+              // User has no profile in this class yet. 
+              // Check if this is a brand new class (no classmates exist yet).
+              const allClassmatesSnap = await db.collection('classmates').where('classId', '==', currentClassId).limit(1).get();
+              const isFirstUser = allClassmatesSnap.empty;
+              
+              const role: UserRole = isFirstUser ? 'Admin' : 'Standard';
+
               const newUser: User = {
                 id: firebaseUser.uid,
                 name: firebaseUser.displayName || 'New User',
                 email: firebaseUser.email!,
-                isAdmin: false,
-                role: 'Standard',
+                isAdmin: role === 'Admin',
+                role: role,
               };
+              
               setUser(newUser);
+
+              // If they are the first user (Admin), auto-create their profile to claim the class
+              if (role === 'Admin') {
+                   await db.collection('classmates').add({
+                       name: newUser.name,
+                       email: newUser.email,
+                       role: 'Admin',
+                       status: 'Active',
+                       classId: currentClassId,
+                   });
+                   // The snapshot listener will refire and update the user state correctly from DB
+              }
             }
           }, error => {
               console.error("Error listening to user profile:", error);
@@ -672,6 +708,51 @@ const App: React.FC = () => {
       }
   };
 
+  const deleteClassLedger = async () => {
+    if (!currentClassId) return;
+    
+    const confirm1 = window.confirm("Are you sure you want to DELETE the COMPLETE Current Class Ledger?");
+    if (!confirm1) return;
+    
+    const confirm2 = window.confirm(`This action is IRREVERSIBLE. All transactions, classmates, and announcements for '${currentClassId}' will be permanently destroyed.`);
+    if (!confirm2) return;
+
+    const input = prompt(`Type '${currentClassId}' to confirm deletion:`);
+    
+    if (input !== currentClassId) {
+        alert("Deletion cancelled. Class ID did not match.");
+        return;
+    }
+
+    setIsLoading(true);
+    try {
+        // Helper to delete collection by query in batches
+        const deleteQueryBatch = async (query: firebase.firestore.Query) => {
+            let snapshot = await query.get();
+            while (!snapshot.empty) {
+                const batch = db.batch();
+                snapshot.docs.forEach(doc => batch.delete(doc.ref));
+                await batch.commit();
+                snapshot = await query.get();
+            }
+        };
+
+        await deleteQueryBatch(db.collection('transactions').where('classId', '==', currentClassId));
+        await deleteQueryBatch(db.collection('classmates').where('classId', '==', currentClassId));
+        await deleteQueryBatch(db.collection('announcements').where('classId', '==', currentClassId));
+        await db.collection('settings').doc(currentClassId).delete();
+
+        alert("Class Ledger deleted successfully.");
+        setCurrentClassId('');
+        setIsSelectingClass(true);
+    } catch (error) {
+        console.error("Error deleting ledger:", error);
+        alert("Failed to delete ledger.");
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
 
   const classBalance = useMemo(() => transactions.reduce((sum, t) => sum + t.amount, 0), [transactions]);
 
@@ -756,6 +837,7 @@ const App: React.FC = () => {
     <DataProvider value={{
       currentClassId,
       migrateLegacyData,
+      deleteClassLedger,
       user,
       logo,
       setLogo: (val) => updateSettings('logo', val),

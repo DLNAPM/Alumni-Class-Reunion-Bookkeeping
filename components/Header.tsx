@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useMemo } from 'react';
 import { useData } from '../context/DataContext';
 
 interface HeaderProps {
@@ -6,7 +7,15 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ onHelpClick }) => {
-  const { user, subtitle } = useData();
+  const { user, subtitle, transactions } = useData();
+
+  const lastTransactionDate = useMemo(() => {
+    if (!transactions || transactions.length === 0) return null;
+    const dates = transactions.map(t => new Date(t.date).getTime());
+    const maxDate = Math.max(...dates);
+    if (isNaN(maxDate)) return null;
+    return new Date(maxDate).toLocaleDateString();
+  }, [transactions]);
 
   return (
     <header className="bg-white shadow-sm p-4 flex justify-between items-center">
@@ -24,11 +33,16 @@ const Header: React.FC<HeaderProps> = ({ onHelpClick }) => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.546-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </button>
-        <div className="flex items-center">
-            <span className="text-gray-600 mr-3 hidden sm:inline">Welcome, {user?.name}</span>
-            <div className="w-10 h-10 rounded-full bg-brand-accent flex items-center justify-center text-white font-bold">
-            {user?.name.charAt(0)}
+        <div className="flex flex-col items-end">
+            <div className="flex items-center">
+                <span className="text-gray-600 mr-3 hidden sm:inline">Welcome, {user?.name}</span>
+                <div className="w-10 h-10 rounded-full bg-brand-accent flex items-center justify-center text-white font-bold">
+                {user?.name.charAt(0)}
+                </div>
             </div>
+            {lastTransactionDate && (
+                 <span className="text-xs text-gray-400 mt-1 mr-1">Last Tx: {lastTransactionDate}</span>
+            )}
         </div>
       </div>
     </header>

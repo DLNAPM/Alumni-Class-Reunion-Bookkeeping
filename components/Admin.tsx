@@ -15,7 +15,7 @@ type BulkEditData = {
 const Admin: React.FC = () => {
   const { 
     user,
-    currentClassId, migrateLegacyData,
+    currentClassId, migrateLegacyData, deleteClassLedger,
     transactions, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, 
     logo, setLogo, subtitle, setSubtitle, integrationSettings, updateIntegrationSettings,
     announcements, addAnnouncement, deleteAnnouncement, uploadTransactionAttachment
@@ -737,7 +737,10 @@ const Admin: React.FC = () => {
           {!isReadOnly && (
           <div className="bg-white p-6 rounded-lg shadow-md border-2 border-dashed border-danger">
             <h3 className="text-xl font-semibold mb-4 text-danger">Danger Zone</h3>
-            <button onClick={handleClearTransactions} className="w-full bg-danger text-white py-2 px-4 rounded-md hover:bg-red-700">Delete All Transactions</button>
+            <div className="space-y-4">
+               <button onClick={handleClearTransactions} className="w-full bg-danger text-white py-2 px-4 rounded-md hover:bg-red-700">Delete All Transactions</button>
+               <button onClick={deleteClassLedger} className="w-full border-2 border-danger text-danger bg-white py-2 px-4 rounded-md hover:bg-red-50 font-bold">DELETE COMPLETE CLASS LEDGER</button>
+            </div>
           </div>
           )}
         </div>
