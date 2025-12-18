@@ -43,7 +43,7 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin, onHelpClick }) => {
                 <div className="sm:text-center md:max-w-2xl md:mx-auto lg:col-span-7 lg:text-left">
                     <h1 className="text-4xl tracking-tight font-extrabold text-gray-900 sm:text-5xl md:text-6xl">
                         <span className="block xl:inline">Modern Finance for</span>{' '}
-                        <span className="block text-brand-primary xl:inline underline decoration-brand-accent">Alumni Classes</span>
+                        <span className="block text-brand-primary xl:inline">Alumni Classes</span>
                     </h1>
                     <p className="mt-6 text-base text-gray-500 sm:mt-8 sm:text-lg sm:max-w-xl sm:mx-auto md:mt-8 md:text-xl lg:mx-0">
                         Simplify dues collection, track expenses with total transparency, and keep your classmates connected. The professional ledger built specifically for your reunion committee.
