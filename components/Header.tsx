@@ -26,7 +26,7 @@ const Header: React.FC<HeaderProps> = ({ onHelpClick }) => {
       <div className="flex items-center space-x-4">
         <button
           onClick={onHelpClick}
-          className="p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-brand-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary"
+          className="p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-brand-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-primary transition-colors"
           aria-label="Help"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -35,13 +35,15 @@ const Header: React.FC<HeaderProps> = ({ onHelpClick }) => {
         </button>
         <div className="flex flex-col items-end">
             <div className="flex items-center">
-                <span className="text-gray-600 mr-3 hidden sm:inline">Welcome, {user?.name}</span>
-                <div className="w-10 h-10 rounded-full bg-brand-accent flex items-center justify-center text-white font-bold">
-                {user?.name.charAt(0)}
+                <span className="text-gray-600 mr-3 hidden sm:inline font-medium">Welcome, {user?.name}</span>
+                <div className="w-10 h-10 rounded-full bg-brand-primary flex items-center justify-center text-white font-bold shadow-sm">
+                  {user?.name?.charAt(0) || 'U'}
                 </div>
             </div>
             {lastTransactionDate && (
-                 <span className="text-xs text-gray-400 mt-1 mr-1">Last Tx: {lastTransactionDate}</span>
+                 <span className="text-[10px] text-gray-400 mt-1 mr-1 uppercase tracking-wider font-semibold">
+                    Last Transaction Date: {lastTransactionDate}
+                 </span>
             )}
         </div>
       </div>

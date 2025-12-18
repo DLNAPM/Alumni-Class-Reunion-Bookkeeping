@@ -104,7 +104,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleClassSelection = async (selectedId: string) => {
-      const id = selectedId?.trim();
+      const id = selectedId?.trim().toUpperCase();
       if (!id) return;
 
       try {
@@ -112,7 +112,7 @@ const App: React.FC = () => {
           const snapshot = await db.collection('classmates').where('classId', '==', id).limit(1).get();
           
           if (snapshot.empty) {
-              const confirmCreate = window.confirm(`Class ID '${id}' does not exist.\n\nDo you want to create a new Class Ledger with ID '${id}' and become the Administrator?`);
+              const confirmCreate = window.confirm(`Class ID '${id}' does not exist.\n\nAre you sure you want to create a New Class ID and be the Admin?`);
               if (!confirmCreate) {
                   return;
               }
@@ -135,7 +135,7 @@ const App: React.FC = () => {
       role: 'Guest',
     };
     setUser(guestUser);
-    setCurrentClassId('demo'); // Default class for guests
+    setCurrentClassId('DEMO'); // Default class for guests
   };
 
   const handleLogout = async () => {
@@ -161,13 +161,13 @@ const App: React.FC = () => {
       if (email === SUPER_ADMIN_EMAIL.toLowerCase()) {
         const adminProfile: User = {
           id: firebaseUser.uid,
-          name: firebaseUser.displayName || 'A.E. Beach High C/o 89',
+          name: firebaseUser.displayName || 'Super Admin',
           email: firebaseUser.email!,
           isAdmin: true,
           role: 'Admin',
         };
         
-        // Try to fetch additional details if they exist in a classmate record for this class
+        // Try to fetch additional details
         try {
            const snapshot = await db.collection('classmates')
                .where('email', '==', firebaseUser.email)
@@ -177,9 +177,9 @@ const App: React.FC = () => {
                const data = snapshot.docs[0].data();
                adminProfile.address = data.address;
                adminProfile.phone = data.phone;
-               adminProfile.name = data.name; // Use stored name
+               adminProfile.name = data.name;
            }
-        } catch(e) { console.warn("Could not fetch admin details", e); }
+        } catch(e) { console.warn("Could not fetch super admin details", e); }
         
         setUser(adminProfile);
         return;
@@ -203,7 +203,7 @@ const App: React.FC = () => {
               }
 
               setUser({
-                id: doc.id, // Use Firestore ID
+                id: doc.id,
                 name: data.name,
                 email: data.email || firebaseUser.email!,
                 isAdmin: data.role === 'Admin',
@@ -212,11 +212,9 @@ const App: React.FC = () => {
                 phone: data.phone,
               });
             } else {
-              // User has no profile in this class yet. 
-              // Check if this is a brand new class (no classmates exist yet).
+              // Check if class is empty - if so, this user is the creator and Admin
               const allClassmatesSnap = await db.collection('classmates').where('classId', '==', currentClassId).limit(1).get();
               const isFirstUser = allClassmatesSnap.empty;
-              
               const role: UserRole = isFirstUser ? 'Admin' : 'Standard';
 
               const newUser: User = {
@@ -229,7 +227,6 @@ const App: React.FC = () => {
               
               setUser(newUser);
 
-              // If they are the first user (Admin), auto-create their profile to claim the class
               if (role === 'Admin') {
                    await db.collection('classmates').add({
                        name: newUser.name,
@@ -238,7 +235,6 @@ const App: React.FC = () => {
                        status: 'Active',
                        classId: currentClassId,
                    });
-                   // The snapshot listener will refire and update the user state correctly from DB
               }
             }
           }, error => {
@@ -303,19 +299,15 @@ const App: React.FC = () => {
         id: doc.id,
         ...doc.data()
       } as Announcement));
-      // Sort client-side
       loadedAnnouncements.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setAnnouncements(loadedAnnouncements);
     });
     return () => unsubscribe();
   }, [currentClassId]);
 
-  // Fetch Settings (Global/Shared for now, or per class?)
-  // Keeping settings global per document ID "general" for simplicity, but ideally should be per classId.
-  // For this implementation, let's assume settings are per classId document in 'settings' collection.
   useEffect(() => {
       if (!currentClassId) return;
-      const docRef = db.collection('settings').doc(currentClassId); // Use classId as doc ID
+      const docRef = db.collection('settings').doc(currentClassId);
       const unsubscribe = docRef.onSnapshot(doc => {
           if (doc.exists) {
               const data = doc.data();
@@ -323,9 +315,8 @@ const App: React.FC = () => {
               if (data?.subtitle) setSubtitle(data.subtitle);
               if (data?.integrationSettings) setIntegrationSettings(data.integrationSettings);
           } else {
-             // Reset defaults if new class
              setLogo('https://via.placeholder.com/150');
-             setSubtitle('Alumni Bookkeeping');
+             setSubtitle(`Class of ${currentClassId}`);
           }
       });
       return () => unsubscribe();
@@ -344,7 +335,6 @@ const App: React.FC = () => {
           classId: currentClassId,
       });
       
-      // Auto-create/update classmate profile
       const existingClassmate = classmates.find(c => c.name.toLowerCase() === transaction.classmateName.toLowerCase());
       if (!existingClassmate) {
           await db.collection('classmates').add({
@@ -363,7 +353,6 @@ const App: React.FC = () => {
   const updateTransaction = async (updatedTransaction: Transaction) => {
     try {
       await db.collection('transactions').doc(updatedTransaction.id).update(updatedTransaction);
-       // Check if name changed and update classmate list if it's a new name
        const existingClassmate = classmates.find(c => c.name.toLowerCase() === updatedTransaction.classmateName.toLowerCase());
        if (!existingClassmate) {
            await db.collection('classmates').add({
@@ -483,7 +472,6 @@ const App: React.FC = () => {
     
     let docId = user.id;
 
-    // Handle Admin Logic: Find or Create doc for Super Admin
     if (user.isAdmin && user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
         const snapshot = await db.collection('classmates')
             .where('email', '==', user.email)
@@ -506,7 +494,6 @@ const App: React.FC = () => {
     }
 
     try {
-        // Prepare update data
         const updatePayload: any = {};
         if (data.name) updatePayload.name = data.name;
         if (data.email) updatePayload.email = data.email;
@@ -515,7 +502,6 @@ const App: React.FC = () => {
         
         await db.collection('classmates').doc(docId).update(updatePayload);
 
-        // If name changed, update all transactions linked to old name
         if (data.name && data.name !== user.name) {
              const batch = db.batch();
              const txSnapshot = await db.collection('transactions')
@@ -530,7 +516,6 @@ const App: React.FC = () => {
         }
 
         setUser(prev => prev ? ({ ...prev, ...data }) : null);
-
     } catch (error) {
         console.error("Error updating profile:", error);
         throw error;
@@ -544,7 +529,6 @@ const App: React.FC = () => {
       return await fileRef.getDownloadURL();
   };
 
-  // Classmate Management Functions
   const updateClassmate = async (id: string, updatedData: Partial<Omit<Classmate, 'id' | 'classId'>>) => {
       try {
           await db.collection('classmates').doc(id).update(updatedData);
@@ -570,27 +554,24 @@ const App: React.FC = () => {
 
   const deleteClassmates = async (classmateIds: string[]): Promise<string | null> => {
       try {
-          // Verify no transactions exist for these classmates
-          // Fetch names first
           const toDeleteRefs = classmateIds.map(id => db.collection('classmates').doc(id));
           const toDeleteSnaps = await Promise.all(toDeleteRefs.map(ref => ref.get()));
           const namesToCheck = toDeleteSnaps.map(snap => snap.data()?.name).filter(n => n);
 
-          // Check transactions (simple check, expensive if many)
           for (const name of namesToCheck) {
               const txSnap = await db.collection('transactions')
                   .where('classmateName', '==', name)
                   .where('classId', '==', currentClassId)
                   .limit(1).get();
               if (!txSnap.empty) {
-                  return `Cannot delete classmate '${name}' because they have associated transactions. Please re-assign or delete transactions first.`;
+                  return `Cannot delete classmate '${name}' because they have associated transactions.`;
               }
           }
 
           const batch = db.batch();
           toDeleteRefs.forEach(ref => batch.delete(ref));
           await batch.commit();
-          return null; // Success
+          return null;
       } catch (error) {
           console.error("Error deleting classmates:", error);
           return "An error occurred while deleting classmates.";
@@ -607,8 +588,6 @@ const App: React.FC = () => {
           const sourceNames = sourceDocs.map(d => d.data()?.name).filter(n => n);
 
           const batch = db.batch();
-
-          // 1. Update transactions for each source name
           for (const sourceName of sourceNames) {
               const txSnap = await db.collection('transactions')
                   .where('classmateName', '==', sourceName)
@@ -619,7 +598,6 @@ const App: React.FC = () => {
               });
           }
 
-          // 2. Delete source classmates
           sourceClassmateIds.forEach(id => {
               batch.delete(db.collection('classmates').doc(id));
           });
@@ -633,24 +611,17 @@ const App: React.FC = () => {
 
   const reconcileDuplicateClassmates = async () => {
     try {
-      // 1. Fetch all classmates in current class
       const snapshot = await db.collection('classmates').where('classId', '==', currentClassId).get();
       const allCms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classmate));
-
-      // 2. Group by normalized name
       const groups: { [name: string]: Classmate[] } = {};
       allCms.forEach(cm => {
         const norm = cm.name.trim().toLowerCase();
         if (!groups[norm]) groups[norm] = [];
         groups[norm].push(cm);
       });
-
-      // 3. Identify duplicates
       const updates: Promise<void>[] = [];
-      
       Object.entries(groups).forEach(([name, group]) => {
         if (group.length > 1) {
-          // Prioritize: Admin role > Has Email > Created First (by ID sorting usually works or timestamp if we had it)
           group.sort((a, b) => {
              if (a.role === 'Admin' && b.role !== 'Admin') return -1;
              if (b.role === 'Admin' && a.role !== 'Admin') return 1;
@@ -658,17 +629,13 @@ const App: React.FC = () => {
              if (b.email && !a.email) return 1;
              return 0; 
           });
-
           const primary = group[0];
           const duplicates = group.slice(1).map(c => c.id);
-          
           updates.push(mergeClassmates(primary.id, duplicates));
         }
       });
-
       await Promise.all(updates);
       alert("Reconciliation complete.");
-
     } catch (error) {
       console.error("Error reconciling:", error);
       alert("Error during reconciliation.");
@@ -680,9 +647,7 @@ const App: React.FC = () => {
       try {
           const batch = db.batch();
           let count = 0;
-
           const collections = ['transactions', 'classmates', 'announcements'];
-          
           for (const col of collections) {
               const snapshot = await db.collection(col).get();
               snapshot.docs.forEach(doc => {
@@ -693,7 +658,6 @@ const App: React.FC = () => {
                   }
               });
           }
-
           if (count > 0) {
               await batch.commit();
               alert(`Successfully migrated ${count} legacy records to Class ID: ${currentClassId}`);
@@ -701,7 +665,6 @@ const App: React.FC = () => {
           } else {
               alert("No legacy records found to migrate.");
           }
-
       } catch (error) {
           console.error("Migration error:", error);
           alert("An error occurred during migration.");
@@ -711,43 +674,31 @@ const App: React.FC = () => {
   const deleteClassLedger = async () => {
     if (!currentClassId) return;
     
-    const confirm1 = window.confirm("Are you sure you want to DELETE the COMPLETE Current Class Ledger?");
+    const confirm1 = window.confirm(`Are you sure you want to delete the COMPLETE Current Class Ledger for '${currentClassId}'? This action is IRREVERSIBLE.`);
     if (!confirm1) return;
-    
-    const confirm2 = window.confirm(`This action is IRREVERSIBLE. All transactions, classmates, and announcements for '${currentClassId}' will be permanently destroyed.`);
-    if (!confirm2) return;
 
-    const input = prompt(`Type '${currentClassId}' to confirm deletion:`);
-    
-    if (input !== currentClassId) {
-        alert("Deletion cancelled. Class ID did not match.");
+    const typedId = prompt(`Type the Class ID '${currentClassId}' to confirm full deletion:`);
+    if (typedId !== currentClassId) {
+        alert("Deletion cancelled. Typed ID did not match.");
         return;
     }
 
     setIsLoading(true);
     try {
-        // Helper to delete collection by query in batches
-        const deleteQueryBatch = async (query: firebase.firestore.Query) => {
-            let snapshot = await query.get();
-            while (!snapshot.empty) {
-                const batch = db.batch();
-                snapshot.docs.forEach(doc => batch.delete(doc.ref));
-                await batch.commit();
-                snapshot = await query.get();
-            }
-        };
-
-        await deleteQueryBatch(db.collection('transactions').where('classId', '==', currentClassId));
-        await deleteQueryBatch(db.collection('classmates').where('classId', '==', currentClassId));
-        await deleteQueryBatch(db.collection('announcements').where('classId', '==', currentClassId));
+        const collections = ['transactions', 'classmates', 'announcements'];
+        for (const col of collections) {
+            const snapshot = await db.collection(col).where('classId', '==', currentClassId).get();
+            const batch = db.batch();
+            snapshot.docs.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+        }
         await db.collection('settings').doc(currentClassId).delete();
-
-        alert("Class Ledger deleted successfully.");
+        alert(`Class Ledger '${currentClassId}' has been completely deleted.`);
         setCurrentClassId('');
         setIsSelectingClass(true);
     } catch (error) {
-        console.error("Error deleting ledger:", error);
-        alert("Failed to delete ledger.");
+        console.error("Error deleting class ledger:", error);
+        alert("Failed to delete the class ledger. Please check permissions.");
     } finally {
         setIsLoading(false);
     }
@@ -769,48 +720,51 @@ const App: React.FC = () => {
     );
   }
 
-  // Render Class Selection Screen if Authenticated but no Class Selected
   if (firebaseUser && isSelectingClass) {
       return (
-          <div className="min-h-screen flex items-center justify-center bg-brand-background p-4">
-              <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
-                  <h2 className="text-2xl font-bold text-brand-text mb-4">Select Class Ledger</h2>
-                  <p className="mb-6 text-gray-600">Please select or enter the Class ID you wish to access.</p>
+          <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+              <div className="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md text-center border border-gray-100">
+                  <div className="bg-brand-primary w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 text-white shadow-lg">
+                    <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                  </div>
+                  <h2 className="text-3xl font-extrabold text-gray-900 mb-2">Select Ledger</h2>
+                  <p className="mb-8 text-gray-500 text-sm">Access an existing class or create a new professional workspace.</p>
                   
                   {userClasses.length > 0 && (
-                      <div className="space-y-3 mb-6">
-                          <p className="text-sm font-semibold text-gray-500 uppercase">Your Classes</p>
+                      <div className="space-y-3 mb-8">
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left mb-2">My Class Ledgers</p>
                           {userClasses.map(id => (
                               <button 
                                 key={id}
                                 onClick={() => handleClassSelection(id)}
-                                className="w-full py-3 px-4 bg-brand-accent/10 hover:bg-brand-accent/20 text-brand-primary font-semibold rounded-lg transition-colors border border-brand-accent/30"
+                                className="w-full py-4 px-6 bg-gray-50 hover:bg-white text-gray-900 font-bold rounded-2xl transition-all border border-gray-100 hover:border-brand-primary hover:shadow-md flex justify-between items-center group"
                               >
-                                {id}
+                                <span>{id}</span>
+                                <svg className="h-5 w-5 text-gray-400 group-hover:text-brand-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                               </button>
                           ))}
                       </div>
                   )}
                   
-                  <div className="relative my-6">
-                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-300"></div></div>
-                    <div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">Or Join New</span></div>
+                  <div className="relative my-8">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
+                    <div className="relative flex justify-center text-xs uppercase tracking-widest"><span className="px-3 bg-white text-gray-400 font-bold">New Ledger ID</span></div>
                   </div>
 
                   <form onSubmit={(e) => { e.preventDefault(); handleClassSelection(inputClassId); }}>
                       <input 
                         type="text" 
-                        placeholder="Enter Class ID (e.g., BEACH89)" 
-                        className="w-full mb-4 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                        placeholder="e.g. BEACHHIGH89" 
+                        className="w-full mb-4 px-6 py-4 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-brand-accent/20 focus:border-brand-primary transition-all text-center uppercase font-bold tracking-widest"
                         value={inputClassId}
                         onChange={(e) => setInputClassId(e.target.value)}
                         required
                       />
-                      <button type="submit" className="w-full bg-brand-primary text-white py-3 rounded-lg font-semibold hover:bg-brand-secondary transition-colors">
-                          Enter Class
+                      <button type="submit" className="w-full bg-brand-primary text-white py-4 rounded-2xl font-bold hover:bg-brand-secondary transition-all shadow-xl hover:shadow-2xl active:scale-95">
+                          Launch Ledger
                       </button>
                   </form>
-                   <button onClick={handleLogout} className="mt-4 text-sm text-gray-500 hover:text-gray-800 underline">Logout</button>
+                   <button onClick={handleLogout} className="mt-8 text-xs font-bold text-gray-400 hover:text-brand-primary transition-colors uppercase tracking-widest">Sign Out</button>
               </div>
           </div>
       );
@@ -875,7 +829,6 @@ const App: React.FC = () => {
             {authError && (
                 <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
                     <p>{authError}</p>
-                    {authError.includes("API Key") && <p className="text-sm mt-1">Please check your <code>firebase.ts</code> configuration.</p>}
                 </div>
             )}
             

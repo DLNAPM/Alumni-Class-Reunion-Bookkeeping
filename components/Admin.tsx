@@ -49,14 +49,11 @@ const Admin: React.FC = () => {
   const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false);
   const [bulkEditData, setBulkEditData] = useState<BulkEditData>({});
 
-  // Customization state
   const [tempLogo, setTempLogo] = useState(logo);
   const [tempSubtitle, setTempSubtitle] = useState(subtitle);
 
-  // Announcement state
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', type: 'text' as 'text' | 'facebook', url: '', imageUrl: '' });
 
-  // Integration state
   const [tempIntegrationSettings, setTempIntegrationSettings] = useState(integrationSettings);
 
   const handleNewTransactionChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -206,7 +203,7 @@ const Admin: React.FC = () => {
   
   const parseDate = (dateValue: any): string | null => {
     if (!dateValue) return null;
-    if (typeof dateValue === 'number') { // Excel date serial number
+    if (typeof dateValue === 'number') {
         const excelEpoch = new Date(1899, 11, 30);
         const date = new Date(excelEpoch.getTime() + dateValue * 86400000);
         return date.toISOString().split('T')[0];
@@ -278,7 +275,7 @@ const Admin: React.FC = () => {
                 const amount = amountKey ? parseAmount(row[amountKey]) : 0;
                 
                 if (!date && !(nameKey && row[nameKey])) {
-                  continue; // Skip rows without a date or a name
+                  continue;
                 }
                 
                 const categoryStr = catKey && row[catKey] ? String(row[catKey]).trim().toLowerCase() : '';
@@ -311,7 +308,7 @@ const Admin: React.FC = () => {
             setImportStatus({ message: `Error processing '${file.name}': ${error instanceof Error ? error.message : String(error)}`, type: 'error' });
         } finally {
             if (fileInputRef.current) {
-                fileInputRef.current.value = ''; // Reset file input
+                fileInputRef.current.value = '';
             }
         }
     };
@@ -472,7 +469,7 @@ const Admin: React.FC = () => {
 
   const handleMigrateLegacyData = async () => {
       if (!currentClassId) return;
-      if (window.confirm(`This will assign all data without a Class ID to the current class: '${currentClassId}'. This action is intended for initial setup or migration. Continue?`)) {
+      if (window.confirm(`This will assign all data without a Class ID to the current class: '${currentClassId}'. Continue?`)) {
           await migrateLegacyData();
       }
   };
@@ -489,12 +486,9 @@ const Admin: React.FC = () => {
     <div className="space-y-8">
       <h2 className="text-3xl font-bold text-brand-text">Admin Panel {isReadOnly && <span className="text-sm font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded ml-2">(Read-Only)</span>}</h2>
 
-      {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Left Column */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Class Management (New Section) */}
           {!isReadOnly && (
           <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-indigo-500">
             <h3 className="text-xl font-semibold mb-2">Class Management</h3>
@@ -510,7 +504,6 @@ const Admin: React.FC = () => {
           </div>
           )}
 
-          {/* Manage All Transactions */}
           <div className="bg-white p-6 rounded-lg shadow-md">
             <div className="sm:flex sm:items-center sm:justify-between mb-4">
               <h3 className="text-xl font-semibold">Manage All Transactions</h3>
@@ -613,7 +606,6 @@ const Admin: React.FC = () => {
               </table>
             </div>
           </div>
-            {/* Manage Announcements */}
             <div className="bg-white p-6 rounded-lg shadow-md">
                 <h3 className="text-xl font-semibold mb-4">Manage Announcements</h3>
                 {!isReadOnly && (
@@ -633,23 +625,21 @@ const Admin: React.FC = () => {
                 </form>
                 )}
                 <div className="mt-6 space-y-2 max-h-60 overflow-y-auto">
-                    <h4 className="font-semibold">Current Announcements</h4>
+                    <h4 className="font-semibold text-sm">Current Announcements</h4>
                     {announcements.map(ann => (
-                        <div key={ann.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                            <span>{ann.title}</span>
+                        <div key={ann.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                            <span className="text-sm font-medium">{ann.title}</span>
                             {!isReadOnly && <button onClick={() => deleteAnnouncement(ann.id)} className="text-danger hover:text-red-700 text-sm">Delete</button>}
                         </div>
                     ))}
-                    {announcements.length === 0 && <p className="text-gray-500 italic">No announcements found.</p>}
+                    {announcements.length === 0 && <p className="text-gray-500 italic text-sm">No announcements found.</p>}
                 </div>
             </div>
 
         </div>
 
-        {/* Right Column */}
         <div className="space-y-8">
 
-          {/* Manually Enter Transaction */}
           {!isReadOnly && (
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h3 className="text-xl font-semibold mb-4">Manually Enter Transaction</h3>
@@ -685,7 +675,6 @@ const Admin: React.FC = () => {
           </div>
           )}
 
-          {/* Import Transactions */}
           {!isReadOnly && (
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h3 className="text-xl font-semibold mb-4">Import Transactions</h3>
@@ -694,7 +683,6 @@ const Admin: React.FC = () => {
           </div>
           )}
 
-          {/* Application Customization */}
           <div className="bg-white p-6 rounded-lg shadow-md">
               <h3 className="text-xl font-semibold mb-4">Application Customization</h3>
               <div className="space-y-4">
@@ -710,7 +698,6 @@ const Admin: React.FC = () => {
               </div>
           </div>
           
-          {/* Payment Integrations */}
           <div className="bg-white p-6 rounded-lg shadow-md">
               <h3 className="text-xl font-semibold mb-4">Payment Integrations</h3>
               <div className="space-y-4">
@@ -718,7 +705,7 @@ const Admin: React.FC = () => {
                       const service = key as keyof IntegrationSettings;
                       return (
                           <div key={service} className="p-3 border rounded-md">
-                              <h4 className="font-semibold capitalize">{service}</h4>
+                              <h4 className="font-semibold capitalize text-sm">{service}</h4>
                               <div className="flex items-center mt-2">
                                   <input type="checkbox" id={`${service}-connected`} checked={tempIntegrationSettings[service].connected} onChange={e => handleIntegrationSettingsChange(service, 'connected', e.target.checked)} disabled={isReadOnly} className="h-4 w-4 text-brand-primary border-gray-300 rounded disabled:cursor-not-allowed"/>
                                   <label htmlFor={`${service}-connected`} className="ml-2 block text-sm text-gray-900">Connected</label>
@@ -733,24 +720,22 @@ const Admin: React.FC = () => {
               </div>
           </div>
 
-          {/* Danger Zone */}
           {!isReadOnly && (
           <div className="bg-white p-6 rounded-lg shadow-md border-2 border-dashed border-danger">
             <h3 className="text-xl font-semibold mb-4 text-danger">Danger Zone</h3>
             <div className="space-y-4">
-               <button onClick={handleClearTransactions} className="w-full bg-danger text-white py-2 px-4 rounded-md hover:bg-red-700">Delete All Transactions</button>
-               <button onClick={deleteClassLedger} className="w-full border-2 border-danger text-danger bg-white py-2 px-4 rounded-md hover:bg-red-50 font-bold">DELETE COMPLETE CLASS LEDGER</button>
+               <button onClick={handleClearTransactions} className="w-full bg-danger text-white py-2 px-4 rounded-md hover:bg-red-700 text-sm font-bold">Delete All Transactions</button>
+               <button onClick={deleteClassLedger} className="w-full border-2 border-danger text-danger bg-white py-2 px-4 rounded-md hover:bg-red-50 font-extrabold uppercase tracking-tight text-sm">Delete Complete Class Ledger</button>
             </div>
           </div>
           )}
         </div>
       </div>
 
-      {/* Edit Modal */}
       {isEditModalOpen && editingTransaction && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg overflow-y-auto max-h-[90vh]">
-            <h3 className="text-xl font-semibold mb-4">Edit Transaction</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-lg overflow-y-auto max-h-[90vh]">
+            <h3 className="text-xl font-bold mb-6">Edit Transaction</h3>
             <div className="space-y-4">
                <input type="date" value={editingTransaction.date} onChange={e => setEditingTransaction({...editingTransaction, date: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" />
                <input type="text" value={editingTransaction.classmateName} onChange={e => setEditingTransaction({...editingTransaction, classmateName: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" />
@@ -778,88 +763,90 @@ const Admin: React.FC = () => {
               </div>
               )}
             </div>
-            <div className="flex justify-end mt-6 space-x-4">
-              <button onClick={closeEditModal} className="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300">Cancel</button>
-              <button onClick={handleUpdateTransaction} disabled={uploadingFile} className="bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary disabled:bg-gray-400">Save Changes</button>
+            <div className="flex justify-end mt-8 space-x-4">
+              <button onClick={closeEditModal} className="bg-gray-100 text-gray-800 py-2 px-6 rounded-xl hover:bg-gray-200 transition-colors">Cancel</button>
+              <button onClick={handleUpdateTransaction} disabled={uploadingFile} className="bg-brand-primary text-white py-2 px-6 rounded-xl hover:bg-brand-secondary disabled:bg-gray-400 transition-colors shadow-md">Save Changes</button>
             </div>
           </div>
         </div>
       )}
-      {/* Bulk Edit Modal */}
+      
       {isBulkEditModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-lg">
-            <h3 className="text-xl font-semibold">Bulk Edit Transactions</h3>
-            <p className="text-sm text-gray-600 my-2">Editing {selectedTransactions.size} transactions. Only fill in fields you want to change. Blank fields will be ignored.</p>
-            <div className="space-y-4 mt-4">
-              <select value={bulkEditData.category || ''} onChange={e => handleBulkEditChange('category', e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-lg border border-gray-100">
+            <h3 className="text-xl font-bold mb-2">Bulk Edit Transactions</h3>
+            <p className="text-sm text-gray-500 mb-6">Editing {selectedTransactions.size} transactions. Only fill in fields you want to change.</p>
+            <div className="space-y-4">
+              <select value={bulkEditData.category || ''} onChange={e => handleBulkEditChange('category', e.target.value)} className="w-full border-gray-200 rounded-xl shadow-sm focus:ring-4 focus:ring-brand-accent/10">
                 <option value="">-- No Change to Category --</option>
                 {Object.values(PaymentCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
               </select>
-              <select value={bulkEditData.paymentType || ''} onChange={e => handleBulkEditChange('paymentType', e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm">
+              <select value={bulkEditData.paymentType || ''} onChange={e => handleBulkEditChange('paymentType', e.target.value)} className="w-full border-gray-200 rounded-xl shadow-sm focus:ring-4 focus:ring-brand-accent/10">
                 <option value="">-- No Change to Payment Type --</option>
                 {Object.values(PaymentType).map(pt => <option key={pt} value={pt}>{pt}</option>)}
               </select>
-              <input type="text" placeholder="Change Classmate Name" defaultValue={bulkEditData.classmateName || ''} onBlur={e => handleBulkEditChange('classmateName', e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm" />
+              <input type="text" placeholder="Change Classmate Name" defaultValue={bulkEditData.classmateName || ''} onBlur={e => handleBulkEditChange('classmateName', e.target.value)} className="w-full border-gray-200 rounded-xl shadow-sm focus:ring-4 focus:ring-brand-accent/10" />
             </div>
-            <div className="flex justify-end mt-6 space-x-4">
-              <button onClick={() => { setIsBulkEditModalOpen(false); setBulkEditData({}); }} className="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300">Cancel</button>
-              <button onClick={handleApplyBulkEdit} className="bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary">Apply Changes</button>
+            <div className="flex justify-end mt-8 space-x-4">
+              <button onClick={() => { setIsBulkEditModalOpen(false); setBulkEditData({}); }} className="bg-gray-100 text-gray-800 py-2 px-6 rounded-xl hover:bg-gray-200 transition-colors">Cancel</button>
+              <button onClick={handleApplyBulkEdit} className="bg-brand-primary text-white py-2 px-6 rounded-xl hover:bg-brand-secondary transition-colors shadow-md">Apply Changes</button>
             </div>
           </div>
         </div>
       )}
-       {/* Reconciliation Modal */}
+
       {reconciliationModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center border-b pb-3 mb-4">
-                <h3 className="text-xl font-semibold">Reconcile Duplicates</h3>
-                <button onClick={() => setReconciliationModalOpen(false)} className="text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
+          <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-gray-100">
+            <div className="flex justify-between items-center border-b pb-4 mb-6">
+                <h3 className="text-2xl font-bold">Reconcile Duplicates</h3>
+                <button onClick={() => setReconciliationModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors text-3xl">&times;</button>
             </div>
             {duplicateGroups.length > 0 ? (
             <>
             <div className="flex-grow overflow-y-auto pr-2">
                 {duplicateGroups.map((group, index) => (
-                    <div key={index} className="mb-6 p-4 border rounded-md bg-gray-50">
-                        <div className="flex justify-between items-center mb-2">
-                            <h4 className="font-semibold">
-                                Duplicate Set {index + 1}: <span className="font-normal text-gray-600">{group[0].paymentType} / {group[0].transactionId} / {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(group[0].amount)}</span>
+                    <div key={index} className="mb-8 p-6 border border-gray-200 rounded-2xl bg-gray-50/50">
+                        <div className="flex justify-between items-center mb-4">
+                            <h4 className="font-bold text-gray-900">
+                                Duplicate Set {index + 1}: <span className="font-medium text-gray-500 text-sm ml-2">{group[0].paymentType} / {group[0].transactionId} / {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(group[0].amount)}</span>
                             </h4>
-                            <button onClick={() => selectForDeletion(group)} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">Keep Oldest, Select Rest</button>
+                            <button onClick={() => selectForDeletion(group)} className="text-xs bg-brand-primary/10 text-brand-primary px-3 py-1.5 rounded-full hover:bg-brand-primary/20 font-bold transition-all">Keep Oldest, Select Rest</button>
                         </div>
                        
-                        <table className="min-w-full text-sm">
-                          <thead className="text-left bg-gray-100">
-                            <tr>
-                              <th className="p-2 w-10">Del</th>
-                              <th className="p-2">Date</th>
-                              <th className="p-2">Name</th>
-                              <th className="p-2">Description</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {group.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(t => (
-                              <tr key={t.id} className="border-t">
-                                <td className="p-2"><input type="checkbox" checked={transactionsToDelete.has(t.id)} onChange={() => toggleTransactionToDelete(t.id)} className="h-4 w-4"/></td>
-                                <td className="p-2">{new Date(t.date).toLocaleDateString()}</td>
-                                <td className="p-2">{t.classmateName}</td>
-                                <td className="p-2 text-gray-600 truncate max-w-xs" title={t.description}>{t.description}</td>
+                        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+                          <table className="min-w-full text-sm">
+                            <thead className="text-left bg-gray-50">
+                              <tr>
+                                <th className="p-3 w-10">Del</th>
+                                <th className="p-3">Date</th>
+                                <th className="p-3">Name</th>
+                                <th className="p-3">Description</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {group.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(t => (
+                                <tr key={t.id} className={`${transactionsToDelete.has(t.id) ? 'bg-red-50/30' : ''} transition-colors`}>
+                                  <td className="p-3"><input type="checkbox" checked={transactionsToDelete.has(t.id)} onChange={() => toggleTransactionToDelete(t.id)} className="h-4 w-4 rounded text-danger focus:ring-danger"/></td>
+                                  <td className="p-3 whitespace-nowrap">{new Date(t.date).toLocaleDateString()}</td>
+                                  <td className="p-3 font-medium text-gray-900">{t.classmateName}</td>
+                                  <td className="p-3 text-gray-500 truncate max-w-xs" title={t.description}>{t.description}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                     </div>
                 ))}
             </div>
-            <div className="flex justify-end mt-4 pt-4 border-t space-x-4">
-              <p className="text-sm text-gray-600 self-center">{transactionsToDelete.size} transaction(s) selected for deletion.</p>
-              <button onClick={() => setReconciliationModalOpen(false)} className="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300">Cancel</button>
-              <button onClick={handleReconciliationDelete} disabled={transactionsToDelete.size === 0} className="bg-danger text-white py-2 px-4 rounded-md hover:bg-red-700 disabled:bg-gray-400">Delete Selected</button>
+            <div className="flex justify-end mt-6 pt-6 border-t space-x-4 items-center">
+              <p className="text-sm font-bold text-danger">{transactionsToDelete.size} transaction(s) marked for deletion.</p>
+              <button onClick={() => setReconciliationModalOpen(false)} className="bg-gray-100 text-gray-800 py-2 px-6 rounded-xl hover:bg-gray-200 transition-colors">Cancel</button>
+              <button onClick={handleReconciliationDelete} disabled={transactionsToDelete.size === 0} className="bg-danger text-white py-2 px-6 rounded-xl hover:bg-red-700 disabled:bg-gray-200 transition-all shadow-md">Confirm Deletion</button>
             </div>
             </>
             ) : (
-                <p className="text-center py-10 text-gray-500">No duplicate transactions found.</p>
+                <p className="text-center py-16 text-gray-500 font-medium italic">No duplicate transactions found.</p>
             )}
           </div>
         </div>
