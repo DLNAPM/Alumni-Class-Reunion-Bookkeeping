@@ -633,7 +633,7 @@ const Admin: React.FC = () => {
                       <td className="px-4 py-2 whitespace-nowrap text-right font-semibold">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(t.amount)}</td>
                       <td className="px-4 py-2 whitespace-nowrap text-center">
                           {t.attachmentUrl ? (
-                              <a href={t.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700" title={t.attachmentName || "View Receipt"}>
+                              <a href={t.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-brand-secondary hover:text-brand-primary" title={t.attachmentName || "View Receipt"}>
                                   <svg className="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                               </a>
                           ) : (
@@ -739,7 +739,7 @@ const Admin: React.FC = () => {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Total Occurrences (How Many?)</label>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Total Occurrences (how many?)</label>
                       <input
                         type="number"
                         min="2"

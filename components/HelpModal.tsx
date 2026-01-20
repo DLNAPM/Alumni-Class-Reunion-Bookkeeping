@@ -87,7 +87,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
 
               <section className="space-y-3">
                 <h4 className="font-bold text-gray-900">1. Authentication</h4>
-                <p className="text-sm text-gray-600">Go to <strong>Auth > Sign-in method</strong> and enable <strong>Google</strong>. Add your deployment URL to <strong>Authorized Domains</strong>.</p>
+                <p className="text-sm text-gray-600">Go to <strong>Auth &gt; Sign-in method</strong> and enable <strong>Google</strong>. Add your deployment URL to <strong>Authorized Domains</strong>.</p>
               </section>
 
               <section className="space-y-3">
