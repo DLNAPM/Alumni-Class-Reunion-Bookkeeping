@@ -11,6 +11,7 @@ type BulkEditData = {
   classmateName?: string;
 };
 
+type RecurringFrequency = 'Weekly' | 'Bi-weekly' | 'Monthly' | 'Quarterly' | 'Annually';
 
 const Admin: React.FC = () => {
   const { 
@@ -28,9 +29,11 @@ const Admin: React.FC = () => {
   const [filter, setFilter] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: keyof Transaction; direction: 'asc' | 'desc' } | null>({ key: 'date', direction: 'desc' });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const manualEntryRef = useRef<HTMLDivElement>(null);
   const [importStatus, setImportStatus] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
 
+  // New Transaction State
   const [newTransaction, setNewTransaction] = useState<Omit<Transaction, 'id' | 'classId'>>({
     date: new Date().toISOString().split('T')[0],
     classmateName: '',
@@ -40,6 +43,11 @@ const Admin: React.FC = () => {
     paymentType: PaymentType.Other,
     transactionId: '',
   });
+
+  // Recurring State
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringFrequency, setRecurringFrequency] = useState<RecurringFrequency>('Monthly');
+  const [recurringOccurrences, setRecurringOccurrences] = useState(1);
 
   const [reconciliationModalOpen, setReconciliationModalOpen] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState<Transaction[][]>([]);
@@ -60,6 +68,21 @@ const Admin: React.FC = () => {
     const { name, value } = e.target;
     setNewTransaction(prev => ({ ...prev, [name]: name === 'amount' ? parseFloat(value) : value }));
   };
+
+  const handleCopyTransaction = (t: Transaction) => {
+    setNewTransaction({
+      date: t.date,
+      classmateName: t.classmateName,
+      amount: t.amount,
+      description: t.description,
+      category: t.category,
+      paymentType: t.paymentType,
+      transactionId: t.transactionId,
+      attachmentUrl: t.attachmentUrl,
+      attachmentName: t.attachmentName
+    });
+    manualEntryRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
   
   const handleNewTransactionFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -77,13 +100,23 @@ const Admin: React.FC = () => {
     }
   };
 
+  const handleRemoveAttachmentNew = () => {
+    setNewTransaction(prev => ({ ...prev, attachmentUrl: undefined, attachmentName: undefined }));
+  };
+
+  const handleRemoveAttachmentEdit = () => {
+    if (editingTransaction) {
+      setEditingTransaction({ ...editingTransaction, attachmentUrl: undefined, attachmentName: undefined });
+    }
+  };
+
   const handleEditTransactionFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && editingTransaction) {
       setUploadingFile(true);
       try {
         const url = await uploadTransactionAttachment(file);
-        setEditingTransaction(prev => prev ? ({ ...prev, attachmentUrl: url, attachmentName: file.name }) : null);
+        setEditingTransaction({ ...editingTransaction, attachmentUrl: url, attachmentName: file.name });
       } catch (err) {
         console.error("Upload failed", err);
         alert("Failed to upload file");
@@ -92,21 +125,39 @@ const Admin: React.FC = () => {
       }
     }
   };
-  
-  const handleRemoveAttachmentNew = () => {
-    setNewTransaction(prev => ({ ...prev, attachmentUrl: null, attachmentName: null } as any));
-  };
 
-  const handleRemoveAttachmentEdit = () => {
-    if (editingTransaction) {
-      setEditingTransaction({ ...editingTransaction, attachmentUrl: null, attachmentName: null });
+  const calculateNextDate = (startDate: string, frequency: RecurringFrequency, index: number): string => {
+    const d = new Date(startDate + 'T00:00:00');
+    switch (frequency) {
+      case 'Weekly': d.setDate(d.getDate() + 7 * index); break;
+      case 'Bi-weekly': d.setDate(d.getDate() + 14 * index); break;
+      case 'Monthly': d.setMonth(d.getMonth() + index); break;
+      case 'Quarterly': d.setMonth(d.getMonth() + 3 * index); break;
+      case 'Annually': d.setFullYear(d.getFullYear() + index); break;
     }
+    return d.toISOString().split('T')[0];
   };
 
-  const handleAddNewTransaction = (e: React.FormEvent) => {
+  const handleAddNewTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newTransaction.classmateName && newTransaction.amount !== undefined) {
-      addTransaction(newTransaction);
+      if (isRecurring && recurringOccurrences > 1) {
+        const confirmMsg = `This will create ${recurringOccurrences} transactions. Continue?`;
+        if (!window.confirm(confirmMsg)) return;
+
+        for (let i = 0; i < recurringOccurrences; i++) {
+          const futureDate = calculateNextDate(newTransaction.date, recurringFrequency, i);
+          await addTransaction({
+            ...newTransaction,
+            date: futureDate,
+            description: `${newTransaction.description} (Entry ${i + 1}/${recurringOccurrences})`.trim()
+          });
+        }
+      } else {
+        await addTransaction(newTransaction);
+      }
+
+      // Reset
       setNewTransaction({
         date: new Date().toISOString().split('T')[0],
         classmateName: '',
@@ -116,6 +167,8 @@ const Admin: React.FC = () => {
         paymentType: PaymentType.Other,
         transactionId: '',
       });
+      setIsRecurring(false);
+      setRecurringOccurrences(1);
     }
   };
 
@@ -555,8 +608,6 @@ const Admin: React.FC = () => {
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('classmateName')}>Classmate {getSortIndicator('classmateName')}</th>
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('description')}>Description {getSortIndicator('description')}</th>
                     <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('category')}>Category {getSortIndicator('category')}</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('paymentType')}>Payment Type {getSortIndicator('paymentType')}</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('transactionId')}>Transaction ID {getSortIndicator('transactionId')}</th>
                     <th className="px-4 py-2 text-right font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('amount')}>Amount {getSortIndicator('amount')}</th>
                     <th className="px-4 py-2 text-center font-medium text-gray-500 uppercase tracking-wider">Receipt</th>
                     {!isReadOnly && <th className="px-4 py-2 text-right font-medium text-gray-500 uppercase tracking-wider">Actions</th>}
@@ -579,8 +630,6 @@ const Admin: React.FC = () => {
                       <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900">{t.classmateName}</td>
                       <td className="px-4 py-2 whitespace-nowrap text-gray-600 truncate max-w-xs" title={t.description}>{t.description}</td>
                       <td className="px-4 py-2 whitespace-nowrap">{t.category}</td>
-                      <td className="px-4 py-2 whitespace-nowrap text-xs">{t.paymentType}</td>
-                      <td className="px-4 py-2 whitespace-nowrap text-gray-500 truncate max-w-xs" title={t.transactionId}>{t.transactionId || ''}</td>
                       <td className="px-4 py-2 whitespace-nowrap text-right font-semibold">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(t.amount)}</td>
                       <td className="px-4 py-2 whitespace-nowrap text-center">
                           {t.attachmentUrl ? (
@@ -593,6 +642,10 @@ const Admin: React.FC = () => {
                       </td>
                       {!isReadOnly && (
                       <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
+                        <button onClick={() => handleCopyTransaction(t)} className="text-brand-primary hover:text-brand-secondary mr-3 flex-inline items-center gap-1" title="Duplicate this transaction">
+                          <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
+                          Copy
+                        </button>
                         <button onClick={() => openEditModal(t)} className="text-brand-secondary hover:text-brand-primary mr-3">Edit</button>
                         <button onClick={() => handleDeleteTransaction(t.id)} className="text-danger hover:text-red-700">Delete</button>
                       </td>
@@ -600,7 +653,7 @@ const Admin: React.FC = () => {
                     </tr>
                   ))}
                    {sortedTransactions.length === 0 && (
-                        <tr><td colSpan={isReadOnly ? 9 : 10} className="text-center py-10 text-gray-500">No transactions match your search.</td></tr>
+                        <tr><td colSpan={isReadOnly ? 7 : 8} className="text-center py-10 text-gray-500">No transactions match your search.</td></tr>
                     )}
                 </tbody>
               </table>
@@ -641,7 +694,7 @@ const Admin: React.FC = () => {
         <div className="space-y-8">
 
           {!isReadOnly && (
-          <div className="bg-white p-6 rounded-lg shadow-md">
+          <div ref={manualEntryRef} className="bg-white p-6 rounded-lg shadow-md">
             <h3 className="text-xl font-semibold mb-4">Manually Enter Transaction</h3>
             <form onSubmit={handleAddNewTransaction} className="space-y-4">
               <input type="date" name="date" value={newTransaction.date} onChange={handleNewTransactionChange} className="w-full border-gray-300 rounded-md shadow-sm" required />
@@ -656,6 +709,51 @@ const Admin: React.FC = () => {
               </select>
               <input type="text" name="transactionId" placeholder="Transaction ID (Optional)" value={newTransaction.transactionId} onChange={handleNewTransactionChange} className="w-full border-gray-300 rounded-md shadow-sm" />
               
+              {/* Recurring Section */}
+              <div className="bg-brand-accent/10 p-4 rounded-xl border border-brand-accent/20">
+                <div className="flex items-center mb-3">
+                  <input
+                    type="checkbox"
+                    id="isRecurring"
+                    checked={isRecurring}
+                    onChange={(e) => setIsRecurring(e.target.checked)}
+                    className="h-4 w-4 text-brand-primary border-gray-300 rounded focus:ring-brand-primary"
+                  />
+                  <label htmlFor="isRecurring" className="ml-2 text-sm font-bold text-brand-primary uppercase tracking-tight">Make Recurring</label>
+                </div>
+                
+                {isRecurring && (
+                  <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Frequency</label>
+                      <select
+                        value={recurringFrequency}
+                        onChange={(e) => setRecurringFrequency(e.target.value as RecurringFrequency)}
+                        className="w-full border-gray-300 rounded-md shadow-sm text-sm"
+                      >
+                        <option value="Weekly">Weekly</option>
+                        <option value="Bi-weekly">Bi-weekly</option>
+                        <option value="Monthly">Monthly</option>
+                        <option value="Quarterly">Quarterly</option>
+                        <option value="Annually">Annually</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Total Occurrences (How Many?)</label>
+                      <input
+                        type="number"
+                        min="2"
+                        max="120"
+                        value={recurringOccurrences}
+                        onChange={(e) => setRecurringOccurrences(parseInt(e.target.value) || 1)}
+                        className="w-full border-gray-300 rounded-md shadow-sm text-sm"
+                        placeholder="e.g. 12"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {newTransaction.category === PaymentCategory.Expense && (
               <div>
                   <label className="block text-sm font-medium text-gray-700">Receipt/Document (JPEG, PDF)</label>
@@ -670,7 +768,9 @@ const Admin: React.FC = () => {
               </div>
               )}
 
-              <button type="submit" disabled={uploadingFile} className="w-full bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary disabled:bg-gray-400">Add Transaction</button>
+              <button type="submit" disabled={uploadingFile} className="w-full bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary disabled:bg-gray-400">
+                {isRecurring ? `Generate ${recurringOccurrences} Transactions` : 'Add Transaction'}
+              </button>
             </form>
           </div>
           )}
@@ -765,7 +865,7 @@ const Admin: React.FC = () => {
             </div>
             <div className="flex justify-end mt-8 space-x-4">
               <button onClick={closeEditModal} className="bg-gray-100 text-gray-800 py-2 px-6 rounded-xl hover:bg-gray-200 transition-colors">Cancel</button>
-              <button onClick={handleUpdateTransaction} disabled={uploadingFile} className="bg-brand-primary text-white py-2 px-6 rounded-xl hover:bg-brand-secondary disabled:bg-gray-400 transition-colors shadow-md">Save Changes</button>
+              <button onClick={handleUpdateTransaction} disabled={uploadingFile} className="bg-brand-primary text-white py-2 px-6 rounded-xl hover:bg-brand-secondary transition-colors shadow-md">Save Changes</button>
             </div>
           </div>
         </div>
