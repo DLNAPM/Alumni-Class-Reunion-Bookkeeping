@@ -537,7 +537,30 @@ const Admin: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <h2 className="text-3xl font-bold text-brand-text">Admin Panel {isReadOnly && <span className="text-sm font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded ml-2">(Read-Only)</span>}</h2>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h2 className="text-3xl font-bold text-brand-text">Admin Panel {isReadOnly && <span className="text-sm font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded ml-2">(Read-Only)</span>}</h2>
+      </div>
+
+      {/* Data Safety Disclaimer */}
+      <div className="bg-blue-50 border-l-4 border-brand-primary p-4 rounded-md shadow-sm">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <svg className="h-5 w-5 text-brand-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-bold text-brand-primary uppercase tracking-tight">Data Safety Notice</h3>
+            <div className="mt-1 text-sm text-brand-secondary">
+              <p>
+                While all transaction data is securely stored in the cloud (Firebase), we strongly recommend that administrators 
+                <strong> download and backup transactions frequently</strong> using the CSV Export tool under the <span className="font-bold">Reporting</span> tab. 
+                Regular local backups ensure you maintain independent historical records for your class committee.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
