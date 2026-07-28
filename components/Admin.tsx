@@ -58,8 +58,136 @@ const Admin: React.FC = () => {
   const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false);
   const [bulkEditData, setBulkEditData] = useState<BulkEditData>({});
 
+  // Duplicate Schedule State
+  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+  const [targetTransactionForDuplicate, setTargetTransactionForDuplicate] = useState<Transaction | null>(null);
+  const [duplicateSchedule, setDuplicateSchedule] = useState({
+    frequency: 'Monthly' as 'Weekly' | 'Bi-weekly' | 'Monthly' | 'Quarterly' | 'Annually',
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    appendSequenceNote: true,
+  });
+
   const [tempLogo, setTempLogo] = useState(logo);
   const [tempSubtitle, setTempSubtitle] = useState(subtitle);
+
+  const openDuplicateModal = (t: Transaction) => {
+    setTargetTransactionForDuplicate(t);
+    const start = t.date || new Date().toISOString().split('T')[0];
+    const startDateObj = new Date(start + 'T00:00:00');
+    const endDateObj = new Date(startDateObj);
+    endDateObj.setMonth(endDateObj.getMonth() + 3);
+
+    setDuplicateSchedule({
+      frequency: 'Monthly',
+      startDate: start,
+      endDate: endDateObj.toISOString().split('T')[0],
+      appendSequenceNote: true,
+    });
+    setDuplicateModalOpen(true);
+  };
+
+  const openBulkDuplicateModal = () => {
+    setTargetTransactionForDuplicate(null);
+    const start = new Date().toISOString().split('T')[0];
+    const endDateObj = new Date();
+    endDateObj.setMonth(endDateObj.getMonth() + 3);
+
+    setDuplicateSchedule({
+      frequency: 'Monthly',
+      startDate: start,
+      endDate: endDateObj.toISOString().split('T')[0],
+      appendSequenceNote: true,
+    });
+    setDuplicateModalOpen(true);
+  };
+
+  const calculatedDuplicateDates = useMemo(() => {
+    const { startDate, endDate, frequency } = duplicateSchedule;
+    if (!startDate || !endDate) return [];
+    const start = new Date(startDate + 'T00:00:00');
+    const end = new Date(endDate + 'T00:00:00');
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return [];
+
+    const dates: string[] = [];
+    let step = 0;
+
+    while (step < 500) {
+      const nextDate = new Date(start);
+      if (frequency === 'Weekly') {
+        nextDate.setDate(start.getDate() + 7 * step);
+      } else if (frequency === 'Bi-weekly') {
+        nextDate.setDate(start.getDate() + 14 * step);
+      } else if (frequency === 'Monthly') {
+        nextDate.setMonth(start.getMonth() + step);
+      } else if (frequency === 'Quarterly') {
+        nextDate.setMonth(start.getMonth() + 3 * step);
+      } else if (frequency === 'Annually') {
+        nextDate.setFullYear(start.getFullYear() + step);
+      }
+
+      if (nextDate > end) break;
+      dates.push(nextDate.toISOString().split('T')[0]);
+      step++;
+    }
+    return dates;
+  }, [duplicateSchedule]);
+
+  const handleExecuteDuplication = async () => {
+    if (calculatedDuplicateDates.length === 0) {
+      alert("Please select a valid Start Date and End Date.");
+      return;
+    }
+
+    const txsToDuplicate: Transaction[] = targetTransactionForDuplicate
+      ? [targetTransactionForDuplicate]
+      : transactions.filter(t => selectedTransactions.has(t.id));
+
+    if (txsToDuplicate.length === 0) {
+      alert("No transactions selected for duplication.");
+      return;
+    }
+
+    const totalToCreate = txsToDuplicate.length * calculatedDuplicateDates.length;
+    if (!window.confirm(`This will generate ${totalToCreate} duplicate transaction(s) across ${calculatedDuplicateDates.length} scheduled date(s).\n\nAre you sure you want to proceed?`)) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      for (const baseTx of txsToDuplicate) {
+        for (let i = 0; i < calculatedDuplicateDates.length; i++) {
+          const dateStr = calculatedDuplicateDates[i];
+          const descSuffix = duplicateSchedule.appendSequenceNote && calculatedDuplicateDates.length > 1
+            ? ` (${duplicateSchedule.frequency} ${i + 1}/${calculatedDuplicateDates.length})`
+            : '';
+
+          const newTxData: Omit<Transaction, 'id' | 'classId'> = {
+            date: dateStr,
+            classmateName: baseTx.classmateName,
+            amount: baseTx.amount,
+            description: `${baseTx.description || ''}${descSuffix}`.trim(),
+            category: baseTx.category,
+            paymentType: baseTx.paymentType,
+            transactionId: baseTx.transactionId ? `${baseTx.transactionId}-COPY${i + 1}` : undefined,
+            attachmentUrl: baseTx.attachmentUrl,
+            attachmentName: baseTx.attachmentName,
+          };
+
+          await addTransaction(newTxData);
+        }
+      }
+
+      alert(`Successfully generated ${totalToCreate} duplicated transaction(s)!`);
+      setDuplicateModalOpen(false);
+      setSelectedTransactions(new Set());
+    } catch (err) {
+      console.error("Error duplicating transactions:", err);
+      alert("Failed to create duplicate transactions.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', type: 'text' as 'text' | 'facebook', url: '', imageUrl: '' });
 
@@ -606,10 +734,11 @@ const Admin: React.FC = () => {
              {!isReadOnly && selectedTransactions.size > 0 && (
               <div className="bg-brand-secondary text-white p-3 rounded-lg shadow-md mb-4 flex items-center justify-between sticky top-0 z-10">
                 <span className="font-semibold">{selectedTransactions.size} transaction(s) selected</span>
-                <div className="flex gap-4 items-center">
-                  <button onClick={() => setIsBulkEditModalOpen(true)} className="bg-yellow-500 hover:bg-yellow-600 px-3 py-1 rounded-md text-sm font-medium">Edit Selected</button>
-                  <button onClick={handleBulkDelete} className="bg-danger hover:bg-red-700 px-3 py-1 rounded-md text-sm font-medium">Delete Selected</button>
-                  <button onClick={() => setSelectedTransactions(new Set())} className="text-white hover:text-gray-200 text-sm font-light">Clear Selection</button>
+                <div className="flex gap-2 items-center flex-wrap">
+                  <button onClick={() => setIsBulkEditModalOpen(true)} className="bg-yellow-500 hover:bg-yellow-600 px-3 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-colors">Edit Selected</button>
+                  <button onClick={openBulkDuplicateModal} className="bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-colors">Duplicate Selected</button>
+                  <button onClick={handleBulkDelete} className="bg-danger hover:bg-red-700 px-3 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-colors">Delete Selected</button>
+                  <button onClick={() => setSelectedTransactions(new Set())} className="text-white hover:text-gray-200 text-xs sm:text-sm font-light ml-2">Clear Selection</button>
                 </div>
               </div>
             )}
@@ -666,12 +795,12 @@ const Admin: React.FC = () => {
                       </td>
                       {!isReadOnly && (
                       <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
-                        <button onClick={() => handleCopyTransaction(t)} className="text-brand-primary hover:text-brand-secondary mr-3 flex-inline items-center gap-1" title="Duplicate this transaction">
+                        <button onClick={() => openDuplicateModal(t)} className="text-brand-primary hover:text-brand-secondary mr-3 inline-flex items-center gap-1 font-medium" title="Duplicate transaction weekly or monthly with start/end date">
                           <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
-                          Copy
+                          Duplicate
                         </button>
-                        <button onClick={() => openEditModal(t)} className="text-brand-secondary hover:text-brand-primary mr-3">Edit</button>
-                        <button onClick={() => handleDeleteTransaction(t.id)} className="text-danger hover:text-red-700">Delete</button>
+                        <button onClick={() => openEditModal(t)} className="text-brand-secondary hover:text-brand-primary mr-3 font-medium">Edit</button>
+                        <button onClick={() => handleDeleteTransaction(t.id)} className="text-danger hover:text-red-700 font-medium">Delete</button>
                       </td>
                       )}
                     </tr>
@@ -991,6 +1120,144 @@ const Admin: React.FC = () => {
             ) : (
                 <p className="text-center py-16 text-gray-500 font-medium italic">No duplicate transactions found.</p>
             )}
+          </div>
+        </div>
+      )}
+
+      {duplicateModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-100 overflow-y-auto max-h-[90vh]">
+            <div className="flex justify-between items-center border-b pb-4 mb-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  {targetTransactionForDuplicate ? 'Duplicate Transaction' : `Duplicate ${selectedTransactions.size} Selected Transactions`}
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">Set a weekly or monthly schedule with Start &amp; End dates</p>
+              </div>
+              <button onClick={() => setDuplicateModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+            </div>
+
+            {targetTransactionForDuplicate && (
+              <div className="bg-blue-50/80 border border-blue-200 rounded-xl p-3.5 mb-5 text-xs text-blue-900 space-y-1">
+                <div className="font-bold text-sm text-brand-primary">{targetTransactionForDuplicate.classmateName}</div>
+                <div className="flex justify-between text-gray-700">
+                  <span>Category: <strong>{targetTransactionForDuplicate.category}</strong></span>
+                  <span className="font-bold text-gray-900">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(targetTransactionForDuplicate.amount)}</span>
+                </div>
+                {targetTransactionForDuplicate.description && (
+                  <div className="text-gray-600 truncate">Desc: {targetTransactionForDuplicate.description}</div>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Frequency</label>
+                <select
+                  value={duplicateSchedule.frequency}
+                  onChange={e => setDuplicateSchedule(prev => ({ ...prev, frequency: e.target.value as any }))}
+                  className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-brand-primary focus:border-brand-primary text-sm font-medium"
+                >
+                  <option value="Weekly">Weekly (Every 7 days)</option>
+                  <option value="Bi-weekly">Bi-weekly (Every 14 days)</option>
+                  <option value="Monthly">Monthly (Every Month)</option>
+                  <option value="Quarterly">Quarterly (Every 3 Months)</option>
+                  <option value="Annually">Annually (Every Year)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    value={duplicateSchedule.startDate}
+                    onChange={e => setDuplicateSchedule(prev => ({ ...prev, startDate: e.target.value }))}
+                    className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-brand-primary focus:border-brand-primary text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">End Date</label>
+                  <input
+                    type="date"
+                    value={duplicateSchedule.endDate}
+                    onChange={e => setDuplicateSchedule(prev => ({ ...prev, endDate: e.target.value }))}
+                    className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-brand-primary focus:border-brand-primary text-sm"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="appendSequenceNote"
+                  checked={duplicateSchedule.appendSequenceNote}
+                  onChange={e => setDuplicateSchedule(prev => ({ ...prev, appendSequenceNote: e.target.checked }))}
+                  className="h-4 w-4 text-brand-primary border-gray-300 rounded focus:ring-brand-primary"
+                />
+                <label htmlFor="appendSequenceNote" className="text-xs text-gray-700 font-medium">
+                  Append recurrence tag to description (e.g. &quot;Monthly 1/4&quot;)
+                </label>
+              </div>
+
+              {/* Schedule Summary & Dates Preview */}
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Duplication Summary</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                    calculatedDuplicateDates.length > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}>
+                    {calculatedDuplicateDates.length} Occurrence(s)
+                  </span>
+                </div>
+
+                {calculatedDuplicateDates.length > 0 ? (
+                  <div>
+                    <p className="text-xs text-gray-600 mb-2">
+                      Will create {targetTransactionForDuplicate ? '1 transaction' : `${selectedTransactions.size} transactions`} on each of the following dates:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
+                      {calculatedDuplicateDates.slice(0, 12).map((d, idx) => (
+                        <span key={d} className="text-[11px] bg-white border border-gray-200 text-gray-700 px-2 py-0.5 rounded font-mono shadow-xs">
+                          {idx + 1}. {d}
+                        </span>
+                      ))}
+                      {calculatedDuplicateDates.length > 12 && (
+                        <span className="text-[11px] text-gray-500 self-center font-semibold">
+                          +{calculatedDuplicateDates.length - 12} more...
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-red-600 italic">
+                    End Date must be on or after Start Date to generate occurrences.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-6 space-x-3">
+              <button
+                type="button"
+                onClick={() => setDuplicateModalOpen(false)}
+                className="bg-gray-100 text-gray-800 py-2 px-4 rounded-xl hover:bg-gray-200 text-sm font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteDuplication}
+                disabled={calculatedDuplicateDates.length === 0 || isLoading}
+                className="bg-brand-primary text-white py-2 px-5 rounded-xl hover:bg-brand-secondary text-sm font-semibold transition-colors shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Generating...' : `Generate ${
+                  (targetTransactionForDuplicate ? 1 : selectedTransactions.size) * calculatedDuplicateDates.length
+                } Transactions`}
+              </button>
+            </div>
           </div>
         </div>
       )}
