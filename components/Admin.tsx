@@ -57,6 +57,7 @@ const Admin: React.FC = () => {
   const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
   const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false);
   const [bulkEditData, setBulkEditData] = useState<BulkEditData>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   // Duplicate Schedule State
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
