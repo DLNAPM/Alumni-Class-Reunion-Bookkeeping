@@ -4,6 +4,7 @@ import { useData } from '../context/DataContext';
 import { PaymentCategory, Transaction, PaymentType, IntegrationSettings, Announcement } from '../types';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
+import ClassmateInput from './ClassmateInput';
 
 type BulkEditData = {
   category?: PaymentCategory;
@@ -17,7 +18,7 @@ const Admin: React.FC = () => {
   const { 
     user,
     currentClassId, migrateLegacyData, deleteClassLedger,
-    transactions, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, 
+    transactions, classmates, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, 
     logo, setLogo, subtitle, setSubtitle, integrationSettings, updateIntegrationSettings,
     announcements, addAnnouncement, deleteAnnouncement, uploadTransactionAttachment
   } = useData();
@@ -721,7 +722,13 @@ const Admin: React.FC = () => {
             <h3 className="text-xl font-semibold mb-4">Manually Enter Transaction</h3>
             <form onSubmit={handleAddNewTransaction} className="space-y-4">
               <input type="date" name="date" value={newTransaction.date} onChange={handleNewTransactionChange} className="w-full border-gray-300 rounded-md shadow-sm" required />
-              <input type="text" name="classmateName" placeholder="Classmate Name" value={newTransaction.classmateName} onChange={handleNewTransactionChange} className="w-full border-gray-300 rounded-md shadow-sm" required />
+              <ClassmateInput
+                value={newTransaction.classmateName}
+                onChange={(val) => setNewTransaction(prev => ({ ...prev, classmateName: val }))}
+                classmates={classmates}
+                transactions={transactions}
+                required
+              />
               <input type="number" step="0.01" name="amount" placeholder="Amount" value={newTransaction.amount} onChange={handleNewTransactionChange} className="w-full border-gray-300 rounded-md shadow-sm" required />
               <textarea name="description" placeholder="Description" value={newTransaction.description} onChange={handleNewTransactionChange} className="w-full border-gray-300 rounded-md shadow-sm" rows={2}></textarea>
               <select name="category" value={newTransaction.category} onChange={handleNewTransactionChange} className="w-full border-gray-300 rounded-md shadow-sm">
@@ -861,7 +868,13 @@ const Admin: React.FC = () => {
             <h3 className="text-xl font-bold mb-6">Edit Transaction</h3>
             <div className="space-y-4">
                <input type="date" value={editingTransaction.date} onChange={e => setEditingTransaction({...editingTransaction, date: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" />
-               <input type="text" value={editingTransaction.classmateName} onChange={e => setEditingTransaction({...editingTransaction, classmateName: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" />
+                <ClassmateInput
+                  value={editingTransaction.classmateName}
+                  onChange={(val) => setEditingTransaction(prev => prev ? ({ ...prev, classmateName: val }) : null)}
+                  classmates={classmates}
+                  transactions={transactions}
+                  required
+                />
                <input type="number" step="0.01" value={editingTransaction.amount} onChange={e => setEditingTransaction({...editingTransaction, amount: parseFloat(e.target.value)})} className="w-full border-gray-300 rounded-md shadow-sm" />
                <textarea value={editingTransaction.description} onChange={e => setEditingTransaction({...editingTransaction, description: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" rows={3}></textarea>
                <select value={editingTransaction.category} onChange={e => setEditingTransaction({...editingTransaction, category: e.target.value as PaymentCategory})} className="w-full border-gray-300 rounded-md shadow-sm">
@@ -908,7 +921,14 @@ const Admin: React.FC = () => {
                 <option value="">-- No Change to Payment Type --</option>
                 {Object.values(PaymentType).map(pt => <option key={pt} value={pt}>{pt}</option>)}
               </select>
-              <input type="text" placeholder="Change Classmate Name" defaultValue={bulkEditData.classmateName || ''} onBlur={e => handleBulkEditChange('classmateName', e.target.value)} className="w-full border-gray-200 rounded-xl shadow-sm focus:ring-4 focus:ring-brand-accent/10" />
+              <ClassmateInput
+                value={bulkEditData.classmateName || ''}
+                onChange={(val) => handleBulkEditChange('classmateName', val)}
+                classmates={classmates}
+                transactions={transactions}
+                label="Change Classmate Name (Optional)"
+                placeholder="Leave empty for no change"
+              />
             </div>
             <div className="flex justify-end mt-8 space-x-4">
               <button onClick={() => { setIsBulkEditModalOpen(false); setBulkEditData({}); }} className="bg-gray-100 text-gray-800 py-2 px-6 rounded-xl hover:bg-gray-200 transition-colors">Cancel</button>
