@@ -2,11 +2,14 @@
 import React, { useState, useMemo } from 'react';
 import { useData } from '../context/DataContext';
 import { PaymentCategory, Transaction } from '../types';
+import ReceiptDashboardModal from './ReceiptDashboardModal';
 
 const Transactions: React.FC = () => {
-  const { transactions, user } = useData();
+  const { transactions, user, classmates, logo, subtitle, currentClassId } = useData();
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [sortConfig, setSortConfig] = useState<{ key: keyof Transaction; direction: 'asc' | 'desc' } | null>({ key: 'date', direction: 'desc' });
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [receiptTxId, setReceiptTxId] = useState<string | undefined>();
 
   const userTransactions = useMemo(() => {
     if (!user?.name) {
@@ -56,9 +59,25 @@ const Transactions: React.FC = () => {
 
   return (
     <div className="bg-white p-6 sm:p-8 rounded-lg shadow-md">
-      <div className="sm:flex sm:items-center sm:justify-between mb-6">
-        <h2 className="text-2xl font-bold text-brand-text">My Transaction History</h2>
-        <div className="mt-4 sm:mt-0">
+      <div className="sm:flex sm:items-center sm:justify-between mb-6 gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-brand-text">My Transaction History</h2>
+          <p className="text-xs text-gray-500 mt-1">View, print, and share your official class payment receipts.</p>
+        </div>
+
+        <div className="mt-4 sm:mt-0 flex items-center gap-3 flex-wrap">
+          {user?.name && (
+            <button
+              onClick={() => {
+                setReceiptTxId(undefined);
+                setReceiptModalOpen(true);
+              }}
+              className="bg-brand-primary text-white hover:bg-brand-secondary text-xs font-bold px-4 py-2 rounded-lg shadow-xs transition-colors flex items-center gap-1.5"
+            >
+              📄 Open Receipt Dashboard
+            </button>
+          )}
+
           <label htmlFor="category-filter" className="sr-only">Filter by category</label>
           <select 
             id="category-filter"
@@ -80,6 +99,7 @@ const Transactions: React.FC = () => {
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('transactionId')}>Transaction ID {getSortIndicator('transactionId')}</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => requestSort('amount')}>Amount {getSortIndicator('amount')}</th>
               <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Receipt</th>
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Dashboard</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -92,23 +112,46 @@ const Transactions: React.FC = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(transaction.amount)}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                   {transaction.attachmentUrl ? (
-                    <a href={transaction.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700" title={transaction.attachmentName || "View Receipt"}>
+                    <a href={transaction.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700" title={transaction.attachmentName || "View Attachment"}>
                       View
                     </a>
                   ) : (
                     <span className="text-gray-300">-</span>
                   )}
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <button
+                    onClick={() => {
+                      setReceiptTxId(transaction.id);
+                      setReceiptModalOpen(true);
+                    }}
+                    className="text-brand-primary hover:text-brand-secondary font-semibold text-xs inline-flex items-center gap-1"
+                  >
+                    📄 Receipt
+                  </button>
+                </td>
               </tr>
             ))}
              {sortedTransactions.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center py-10 text-gray-500">No transactions found for the selected criteria.</td>
+                <td colSpan={7} className="text-center py-10 text-gray-500">No transactions found for the selected criteria.</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      <ReceiptDashboardModal
+        isOpen={receiptModalOpen}
+        onClose={() => setReceiptModalOpen(false)}
+        classmateName={user?.name || ''}
+        initialTransactionId={receiptTxId}
+        classmates={classmates}
+        transactions={transactions}
+        logo={logo}
+        subtitle={subtitle}
+        currentClassId={currentClassId}
+      />
     </div>
   );
 };

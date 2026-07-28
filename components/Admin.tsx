@@ -5,6 +5,7 @@ import { PaymentCategory, Transaction, PaymentType, IntegrationSettings, Announc
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import ClassmateInput from './ClassmateInput';
+import ReceiptDashboardModal from './ReceiptDashboardModal';
 
 type BulkEditData = {
   category?: PaymentCategory;
@@ -58,6 +59,36 @@ const Admin: React.FC = () => {
   const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false);
   const [bulkEditData, setBulkEditData] = useState<BulkEditData>({});
   const [isLoading, setIsLoading] = useState(false);
+
+  // Receipt Dashboard State
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [receiptClassmateName, setReceiptClassmateName] = useState('');
+  const [receiptInitialTxId, setReceiptInitialTxId] = useState<string | undefined>();
+
+  const openReceiptDashboard = (classmateName: string, initialTxId?: string) => {
+    setReceiptClassmateName(classmateName);
+    setReceiptInitialTxId(initialTxId);
+    setReceiptModalOpen(true);
+  };
+
+  const handleOpenBulkReceiptDashboard = () => {
+    if (selectedTransactions.size === 0) return;
+    const selectedTxIds = Array.from(selectedTransactions);
+    const firstTx = transactions.find(t => t.id === selectedTxIds[0]);
+    if (firstTx && firstTx.classmateName) {
+      openReceiptDashboard(firstTx.classmateName, firstTx.id);
+    }
+  };
+
+  // Check URL query parameters for direct receipt link opening
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const cm = params.get('classmate');
+    const txId = params.get('txId');
+    if (cm) {
+      openReceiptDashboard(cm, txId || undefined);
+    }
+  }, []);
 
   // Duplicate Schedule State
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
@@ -743,6 +774,7 @@ const Admin: React.FC = () => {
               <div className="bg-brand-secondary text-white p-3 rounded-lg shadow-md mb-4 flex items-center justify-between sticky top-0 z-10">
                 <span className="font-semibold">{selectedTransactions.size} transaction(s) selected</span>
                 <div className="flex gap-2 items-center flex-wrap">
+                  <button onClick={handleOpenBulkReceiptDashboard} className="bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-colors">Receipt Dashboard</button>
                   <button onClick={() => setIsBulkEditModalOpen(true)} className="bg-yellow-500 hover:bg-yellow-600 px-3 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-colors">Edit Selected</button>
                   <button onClick={openBulkDuplicateModal} className="bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-colors">Duplicate Selected</button>
                   <button onClick={handleBulkDelete} className="bg-danger hover:bg-red-700 px-3 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-colors">Delete Selected</button>
@@ -803,6 +835,10 @@ const Admin: React.FC = () => {
                       </td>
                       {!isReadOnly && (
                       <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
+                        <button onClick={() => openReceiptDashboard(t.classmateName, t.id)} className="text-emerald-700 hover:text-emerald-900 mr-3 inline-flex items-center gap-1 font-semibold" title="Create and view Receipt Dashboard for this classmate">
+                          <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                          Receipt
+                        </button>
                         <button onClick={() => openDuplicateModal(t)} className="text-brand-primary hover:text-brand-secondary mr-3 inline-flex items-center gap-1 font-medium" title="Duplicate transaction weekly or monthly with start/end date">
                           <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
                           Duplicate
@@ -1269,6 +1305,18 @@ const Admin: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ReceiptDashboardModal
+        isOpen={receiptModalOpen}
+        onClose={() => setReceiptModalOpen(false)}
+        classmateName={receiptClassmateName}
+        initialTransactionId={receiptInitialTxId}
+        classmates={classmates}
+        transactions={transactions}
+        logo={logo}
+        subtitle={subtitle}
+        currentClassId={currentClassId}
+      />
     </div>
   );
 };
