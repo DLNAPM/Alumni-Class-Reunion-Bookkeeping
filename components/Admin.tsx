@@ -165,15 +165,22 @@ const Admin: React.FC = () => {
 
           const newTxData: Omit<Transaction, 'id' | 'classId'> = {
             date: dateStr,
-            classmateName: baseTx.classmateName,
-            amount: baseTx.amount,
+            classmateName: baseTx.classmateName || 'Unknown',
+            amount: Number(baseTx.amount) || 0,
             description: `${baseTx.description || ''}${descSuffix}`.trim(),
-            category: baseTx.category,
-            paymentType: baseTx.paymentType,
-            transactionId: baseTx.transactionId ? `${baseTx.transactionId}-COPY${i + 1}` : undefined,
-            attachmentUrl: baseTx.attachmentUrl,
-            attachmentName: baseTx.attachmentName,
+            category: baseTx.category || PaymentCategory.Dues,
+            paymentType: baseTx.paymentType || PaymentType.Other,
           };
+
+          if (baseTx.transactionId) {
+            newTxData.transactionId = `${baseTx.transactionId}-COPY${i + 1}`;
+          }
+          if (baseTx.attachmentUrl) {
+            newTxData.attachmentUrl = baseTx.attachmentUrl;
+          }
+          if (baseTx.attachmentName) {
+            newTxData.attachmentName = baseTx.attachmentName;
+          }
 
           await addTransaction(newTxData);
         }

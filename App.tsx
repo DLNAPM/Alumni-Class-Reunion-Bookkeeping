@@ -330,41 +330,61 @@ const App: React.FC = () => {
   const addTransaction = async (transaction: Omit<Transaction, 'id' | 'classId'>) => {
     if (!currentClassId) return;
     try {
+      const cleanData: Record<string, any> = {};
+      Object.entries(transaction).forEach(([key, val]) => {
+        if (val !== undefined) {
+          cleanData[key] = val;
+        }
+      });
+
       await db.collection('transactions').add({
-          ...transaction,
+          ...cleanData,
           classId: currentClassId,
       });
       
-      const existingClassmate = classmates.find(c => c.name.toLowerCase() === transaction.classmateName.toLowerCase());
-      if (!existingClassmate) {
-          await db.collection('classmates').add({
-              name: transaction.classmateName,
-              role: 'Standard',
-              status: 'Active',
-              classId: currentClassId,
-          });
+      if (transaction.classmateName && transaction.classmateName.trim()) {
+        const existingClassmate = classmates.find(c => c.name && c.name.toLowerCase() === transaction.classmateName.toLowerCase());
+        if (!existingClassmate) {
+            await db.collection('classmates').add({
+                name: transaction.classmateName.trim(),
+                role: 'Standard',
+                status: 'Active',
+                classId: currentClassId,
+            });
+        }
       }
     } catch (error) {
       console.error("Error adding transaction: ", error);
       alert("Error adding transaction. Please check your connection.");
+      throw error;
     }
   };
 
   const updateTransaction = async (updatedTransaction: Transaction) => {
     try {
-      await db.collection('transactions').doc(updatedTransaction.id).update(updatedTransaction);
-       const existingClassmate = classmates.find(c => c.name.toLowerCase() === updatedTransaction.classmateName.toLowerCase());
-       if (!existingClassmate) {
-           await db.collection('classmates').add({
-               name: updatedTransaction.classmateName,
-               role: 'Standard',
-               status: 'Active',
-               classId: currentClassId,
-           });
-       }
+      const cleanData: Record<string, any> = {};
+      Object.entries(updatedTransaction).forEach(([key, val]) => {
+        if (val !== undefined) {
+          cleanData[key] = val;
+        }
+      });
+
+      await db.collection('transactions').doc(updatedTransaction.id).update(cleanData);
+      if (updatedTransaction.classmateName && updatedTransaction.classmateName.trim()) {
+        const existingClassmate = classmates.find(c => c.name && c.name.toLowerCase() === updatedTransaction.classmateName.toLowerCase());
+        if (!existingClassmate) {
+            await db.collection('classmates').add({
+                name: updatedTransaction.classmateName.trim(),
+                role: 'Standard',
+                status: 'Active',
+                classId: currentClassId,
+            });
+        }
+      }
     } catch (error) {
       console.error("Error updating transaction: ", error);
       alert("Error updating transaction.");
+      throw error;
     }
   };
   
