@@ -132,7 +132,20 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
     setEmailSubject(`[${subtitle || 'Class Ledger'}] Official Payment ${txDesc} - ${activeName}`);
   }, [selectedTx, selectedClassmateName, subtitle, isAdmin, user?.name]);
 
-  if (!isOpen) return null;
+  // Distinct classmate list for dropdown selector (only available to Admins)
+  const allClassmateNames = useMemo(() => {
+    if (!isAdmin) {
+      return user?.name ? [user.name] : [];
+    }
+    return Array.from(
+      new Set([
+        ...classmates.map(c => c.name),
+        ...transactions.map(t => t.classmateName)
+      ])
+    ).filter(Boolean).sort();
+  }, [isAdmin, user?.name, classmates, transactions]);
+
+  const activeDisplayName = !isAdmin && user?.name ? user.name : selectedClassmateName;
 
   const formatMoney = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -143,8 +156,6 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 3000);
   };
-
-  const activeDisplayName = !isAdmin && user?.name ? user.name : selectedClassmateName;
 
   const generateEmailBodyText = () => {
     let text = `OFFICIAL PAYMENT STATEMENT & RECEIPT\n`;
@@ -200,18 +211,7 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
     window.print();
   };
 
-  // Distinct classmate list for dropdown selector (only available to Admins)
-  const allClassmateNames = useMemo(() => {
-    if (!isAdmin) {
-      return user?.name ? [user.name] : [];
-    }
-    return Array.from(
-      new Set([
-        ...classmates.map(c => c.name),
-        ...transactions.map(t => t.classmateName)
-      ])
-    ).filter(Boolean).sort();
-  }, [isAdmin, user?.name, classmates, transactions]);
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
