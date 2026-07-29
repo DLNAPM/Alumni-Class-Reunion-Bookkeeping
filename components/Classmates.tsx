@@ -128,24 +128,48 @@ const Classmates: React.FC = () => {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
     
+    // Search state for Mobile Number, Email Address, Home Address, or Name
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchField, setSearchField] = useState<'all' | 'name' | 'phone' | 'email' | 'address'>('all');
+
     const selectAllRef = useRef<HTMLInputElement>(null);
     
-    const sortedClassmates = useMemo(() => 
-        [...classmates].sort((a, b) => a.name.localeCompare(b.name)), 
-        [classmates]
-    );
+    const filteredClassmates = useMemo(() => {
+        const q = searchQuery.trim().toLowerCase();
+        const sorted = [...classmates].sort((a, b) => a.name.localeCompare(b.name));
+        if (!q) return sorted;
+
+        const cleanDigits = (str?: string) => (str || '').replace(/\D/g, '');
+        const cleanQuery = q.replace(/\D/g, '');
+
+        return sorted.filter(c => {
+            const nameMatch = c.name.toLowerCase().includes(q);
+            const emailMatch = (c.email || '').toLowerCase().includes(q);
+            const addressMatch = (c.address || '').toLowerCase().includes(q);
+            
+            const rawPhone = (c.phone || '').toLowerCase();
+            const phoneMatch = rawPhone.includes(q) || (cleanQuery.length >= 3 && cleanDigits(c.phone).includes(cleanQuery));
+
+            if (searchField === 'name') return nameMatch;
+            if (searchField === 'phone') return phoneMatch;
+            if (searchField === 'email') return emailMatch;
+            if (searchField === 'address') return addressMatch;
+
+            return nameMatch || emailMatch || phoneMatch || addressMatch;
+        });
+    }, [classmates, searchQuery, searchField]);
 
     useEffect(() => {
         if (selectAllRef.current) {
-          const isIndeterminate = selectedIds.size > 0 && selectedIds.size < sortedClassmates.length;
+          const isIndeterminate = selectedIds.size > 0 && selectedIds.size < filteredClassmates.length;
           selectAllRef.current.indeterminate = isIndeterminate;
         }
-    }, [selectedIds, sortedClassmates.length]);
+    }, [selectedIds, filteredClassmates.length]);
 
 
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.checked) {
-            setSelectedIds(new Set(sortedClassmates.map(c => c.id)));
+            setSelectedIds(new Set(filteredClassmates.map(c => c.id)));
         } else {
             setSelectedIds(new Set());
         }
@@ -194,12 +218,88 @@ const Classmates: React.FC = () => {
       }
     }
 
-    const allSelected = sortedClassmates.length > 0 && selectedIds.size === sortedClassmates.length;
+    const allSelected = filteredClassmates.length > 0 && selectedIds.size === filteredClassmates.length;
 
     return (
         <>
             <div className="bg-white p-6 sm:p-8 rounded-lg shadow-md">
-                <h2 className="text-2xl font-bold text-brand-text mb-6">Manage Classmate Profiles {isReadOnly && <span className="text-sm font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded ml-2">(Read-Only)</span>}</h2>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 className="text-2xl font-bold text-brand-text">
+                            Manage Classmate Profiles {isReadOnly && <span className="text-sm font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded ml-2">(Read-Only)</span>}
+                        </h2>
+                        <p className="text-xs text-gray-500 mt-1">Search, filter, edit, and organize classmate profiles.</p>
+                    </div>
+                    <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg self-start md:self-auto">
+                        Total Classmates: <strong className="text-gray-900">{classmates.length}</strong>
+                    </div>
+                </div>
+
+                {/* Search Bar Component */}
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6">
+                    <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                        <div className="relative flex-1">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </div>
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Search by Name, Mobile Number, Email, or Home Address..."
+                                className="w-full pl-10 pr-10 py-2.5 text-sm bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition-all shadow-xs"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                                    title="Clear search"
+                                >
+                                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <label htmlFor="search-field" className="text-xs font-semibold text-gray-600 whitespace-nowrap">Filter By:</label>
+                            <select
+                                id="search-field"
+                                value={searchField}
+                                onChange={(e) => setSearchField(e.target.value as any)}
+                                className="bg-white border border-gray-300 text-gray-700 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-primary font-medium shadow-xs cursor-pointer"
+                            >
+                                <option value="all">🔍 All Fields</option>
+                                <option value="name">👤 Name</option>
+                                <option value="phone">📱 Mobile Number</option>
+                                <option value="email">✉️ Email Address</option>
+                                <option value="address">🏠 Home Address</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {searchQuery.trim() && (
+                        <div className="mt-3 pt-3 border-t border-gray-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <div className="flex items-center gap-2 text-gray-600">
+                                <span>
+                                    Showing <strong>{filteredClassmates.length}</strong> of <strong>{classmates.length}</strong> classmate profile(s) matching <strong>"{searchQuery}"</strong>
+                                    {searchField !== 'all' && (
+                                        <span> in <em>{searchField === 'phone' ? 'Mobile Number' : searchField === 'email' ? 'Email Address' : searchField === 'address' ? 'Home Address' : 'Name'}</em></span>
+                                    )}
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                className="text-brand-secondary hover:text-brand-primary font-bold hover:underline"
+                            >
+                                Clear Search Filter
+                            </button>
+                        </div>
+                    )}
+                </div>
                 
                 {!isReadOnly && selectedIds.size > 0 && (
                   <div className="bg-brand-secondary text-white p-3 rounded-lg shadow-md mb-4 flex items-center justify-between sticky top-0 z-10">
@@ -233,13 +333,15 @@ const Classmates: React.FC = () => {
                                 )}
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Classmate Name</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email (Login)</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mobile Number</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Home Address</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                                 {!isReadOnly && <th scope="col" className="relative px-6 py-3"><span className="sr-only">Edit</span></th>}
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {sortedClassmates.map(classmate => (
+                            {filteredClassmates.map(classmate => (
                                 <tr key={classmate.id} className={selectedIds.has(classmate.id) ? 'bg-brand-accent/20' : ''}>
                                     {!isReadOnly && (
                                     <td className="p-4">
@@ -253,6 +355,18 @@ const Classmates: React.FC = () => {
                                     )}
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{classmate.name}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{classmate.email || 'Not set'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {classmate.phone ? (
+                                            <a href={`tel:${classmate.phone}`} className="hover:text-brand-primary hover:underline">
+                                                {classmate.phone}
+                                            </a>
+                                        ) : (
+                                            <span className="text-gray-300 italic">Not set</span>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title={classmate.address || ''}>
+                                        {classmate.address || <span className="text-gray-300 italic">Not set</span>}
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${classmate.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                             {classmate.status}
@@ -269,14 +383,29 @@ const Classmates: React.FC = () => {
                                     </td>
                                     {!isReadOnly && (
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button onClick={() => setEditingClassmate(classmate)} className="text-brand-secondary hover:text-brand-primary">Edit</button>
+                                        <button onClick={() => setEditingClassmate(classmate)} className="text-brand-secondary hover:text-brand-primary font-semibold">Edit</button>
                                     </td>
                                     )}
                                 </tr>
                             ))}
-                            {sortedClassmates.length === 0 && (
+                            {filteredClassmates.length === 0 && (
                                 <tr>
-                                    <td colSpan={isReadOnly ? 5 : 6} className="text-center py-10 text-gray-500">No classmates found. Transactions may be empty.</td>
+                                    <td colSpan={isReadOnly ? 6 : 8} className="text-center py-10 text-gray-500">
+                                        {searchQuery.trim() ? (
+                                            <div>
+                                                <p className="text-gray-700 font-semibold mb-1">No classmates found matching "{searchQuery}"</p>
+                                                <p className="text-xs text-gray-400">Try searching by a different name, phone number, email, or home address.</p>
+                                                <button
+                                                    onClick={() => setSearchQuery('')}
+                                                    className="mt-3 px-3 py-1.5 bg-brand-primary text-white text-xs font-semibold rounded-lg hover:bg-brand-secondary transition-colors"
+                                                >
+                                                    Clear Search Filter
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            "No classmates found. Transactions may be empty."
+                                        )}
+                                    </td>
                                 </tr>
                             )}
                         </tbody>
