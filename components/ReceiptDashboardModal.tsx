@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Transaction, Classmate, PaymentCategory } from '../types';
+import { useData } from '../context/DataContext';
 
 interface ReceiptDashboardModalProps {
   isOpen: boolean;
@@ -24,7 +25,18 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
   subtitle,
   currentClassId,
 }) => {
-  const [selectedClassmateName, setSelectedClassmateName] = useState<string>(initialClassmateName);
+  const { user } = useData();
+  const isAdmin = Boolean(user?.isAdmin || user?.role === 'Admin');
+
+  // Non-admin classmates are strictly locked to their own registered user name
+  const effectiveClassmateName = useMemo(() => {
+    if (!isAdmin && user?.name) {
+      return user.name;
+    }
+    return initialClassmateName || user?.name || '';
+  }, [isAdmin, user?.name, initialClassmateName]);
+
+  const [selectedClassmateName, setSelectedClassmateName] = useState<string>(effectiveClassmateName);
   const [selectedTxId, setSelectedTxId] = useState<string | undefined>(initialTransactionId);
   const [activeTab, setActiveTab] = useState<'receipt' | 'history' | 'email'>('receipt');
   
@@ -37,17 +49,22 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
 
   // Sync selected classmate when props change or modal opens
   React.useEffect(() => {
-    setSelectedClassmateName(initialClassmateName);
+    if (!isAdmin && user?.name) {
+      setSelectedClassmateName(user.name);
+    } else {
+      setSelectedClassmateName(initialClassmateName || user?.name || '');
+    }
     setSelectedTxId(initialTransactionId);
-  }, [initialClassmateName, initialTransactionId, isOpen]);
+  }, [initialClassmateName, initialTransactionId, isOpen, isAdmin, user?.name]);
 
   // Find classmate profile
   const classmateProfile = useMemo(() => {
-    if (!selectedClassmateName) return null;
+    const targetName = !isAdmin && user?.name ? user.name : selectedClassmateName;
+    if (!targetName) return null;
     return classmates.find(
-      c => c.name.trim().toLowerCase() === selectedClassmateName.trim().toLowerCase()
+      c => c.name.trim().toLowerCase() === targetName.trim().toLowerCase()
     );
-  }, [classmates, selectedClassmateName]);
+  }, [classmates, selectedClassmateName, isAdmin, user?.name]);
 
   // Update default recipient email when classmate profile loads
   React.useEffect(() => {
@@ -58,14 +75,15 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
     }
   }, [classmateProfile]);
 
-  // Classmate's transactions
+  // Classmate's transactions - strictly limited to logged-in classmate if not admin
   const classmateTxs = useMemo(() => {
-    if (!selectedClassmateName) return [];
-    const normName = selectedClassmateName.trim().toLowerCase();
+    const targetName = !isAdmin && user?.name ? user.name : selectedClassmateName;
+    if (!targetName) return [];
+    const normName = targetName.trim().toLowerCase();
     return transactions.filter(
       t => t.classmateName && t.classmateName.trim().toLowerCase() === normName
     ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, selectedClassmateName]);
+  }, [transactions, selectedClassmateName, isAdmin, user?.name]);
 
   // Selected Transaction for individual receipt
   const selectedTx = useMemo(() => {
@@ -100,17 +118,19 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
   const shareableUrl = useMemo(() => {
     const origin = window.location.origin + window.location.pathname;
     const params = new URLSearchParams();
+    const activeName = !isAdmin && user?.name ? user.name : selectedClassmateName;
     if (currentClassId) params.set('classId', currentClassId);
-    if (selectedClassmateName) params.set('classmate', selectedClassmateName);
+    if (activeName) params.set('classmate', activeName);
     if (selectedTx) params.set('txId', selectedTx.id);
     return `${origin}?${params.toString()}`;
-  }, [currentClassId, selectedClassmateName, selectedTx]);
+  }, [currentClassId, selectedClassmateName, selectedTx, isAdmin, user?.name]);
 
   // Update default email subject when selectedTx or classmateName changes
   React.useEffect(() => {
+    const activeName = !isAdmin && user?.name ? user.name : selectedClassmateName;
     const txDesc = selectedTx ? `Receipt #${selectedTx.id.slice(0, 8).toUpperCase()}` : 'Statement';
-    setEmailSubject(`[${subtitle || 'Class Ledger'}] Official Payment ${txDesc} - ${selectedClassmateName}`);
-  }, [selectedTx, selectedClassmateName, subtitle]);
+    setEmailSubject(`[${subtitle || 'Class Ledger'}] Official Payment ${txDesc} - ${activeName}`);
+  }, [selectedTx, selectedClassmateName, subtitle, isAdmin, user?.name]);
 
   if (!isOpen) return null;
 
@@ -124,11 +144,13 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
     setTimeout(() => setCopiedLink(false), 3000);
   };
 
+  const activeDisplayName = !isAdmin && user?.name ? user.name : selectedClassmateName;
+
   const generateEmailBodyText = () => {
     let text = `OFFICIAL PAYMENT STATEMENT & RECEIPT\n`;
     text += `=====================================\n`;
     text += `Class Ledger: ${subtitle} (${currentClassId})\n`;
-    text += `Classmate: ${selectedClassmateName}\n`;
+    text += `Classmate: ${activeDisplayName}\n`;
     if (recipientEmail) text += `Email: ${recipientEmail}\n`;
     text += `Date Generated: ${new Date().toLocaleDateString()}\n\n`;
 
@@ -178,13 +200,18 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
     window.print();
   };
 
-  // Distinct classmate list for dropdown selector
-  const allClassmateNames = Array.from(
-    new Set([
-      ...classmates.map(c => c.name),
-      ...transactions.map(t => t.classmateName)
-    ])
-  ).filter(Boolean).sort();
+  // Distinct classmate list for dropdown selector (only available to Admins)
+  const allClassmateNames = useMemo(() => {
+    if (!isAdmin) {
+      return user?.name ? [user.name] : [];
+    }
+    return Array.from(
+      new Set([
+        ...classmates.map(c => c.name),
+        ...transactions.map(t => t.classmateName)
+      ])
+    ).filter(Boolean).sort();
+  }, [isAdmin, user?.name, classmates, transactions]);
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
@@ -212,23 +239,30 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            {/* Classmate Picker */}
-            <div className="relative">
-              <select
-                value={selectedClassmateName}
-                onChange={(e) => {
-                  setSelectedClassmateName(e.target.value);
-                  setSelectedTxId(undefined);
-                }}
-                className="bg-white/10 text-white text-xs font-semibold rounded-xl px-3 py-2 border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/40 cursor-pointer"
-              >
-                {allClassmateNames.map(name => (
-                  <option key={name} value={name} className="bg-gray-800 text-white">
-                    👤 {name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Classmate Selector: Admins can switch between classmates; Classmates are locked to their own name */}
+            {isAdmin ? (
+              <div className="relative">
+                <select
+                  value={selectedClassmateName}
+                  onChange={(e) => {
+                    setSelectedClassmateName(e.target.value);
+                    setSelectedTxId(undefined);
+                  }}
+                  className="bg-white/10 text-white text-xs font-semibold rounded-xl px-3 py-2 border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/40 cursor-pointer"
+                >
+                  {allClassmateNames.map(name => (
+                    <option key={name} value={name} className="bg-gray-800 text-white">
+                      👤 {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="bg-white/10 text-white text-xs font-semibold rounded-xl px-3 py-2 border border-white/20 flex items-center gap-1.5">
+                <span>👤</span>
+                <span>{activeDisplayName}</span>
+              </div>
+            )}
 
             <button
               onClick={onClose}
@@ -246,7 +280,7 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
         <div className="bg-gray-50 border-b border-gray-200 px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-lg font-bold text-gray-900">{selectedClassmateName}</h3>
+              <h3 className="text-lg font-bold text-gray-900">{activeDisplayName}</h3>
               {classmateProfile?.role && (
                 <span className="text-[10px] bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded-md">
                   {classmateProfile.role}
@@ -398,7 +432,7 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
                   <div className="grid grid-cols-2 gap-4 sm:gap-6 mb-6 text-sm">
                     <div>
                       <span className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Received From</span>
-                      <span className="font-bold text-gray-900 text-base">{selectedClassmateName}</span>
+                      <span className="font-bold text-gray-900 text-base">{activeDisplayName}</span>
                       {recipientEmail && <span className="block text-xs text-gray-500">{recipientEmail}</span>}
                     </div>
 
@@ -473,7 +507,7 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
                 <div className="bg-white p-12 text-center rounded-2xl border border-gray-200">
                   <div className="text-3xl mb-2">📥</div>
                   <h4 className="text-lg font-bold text-gray-700">No Transactions Found</h4>
-                  <p className="text-xs text-gray-500 mt-1">There are no payment records associated with {selectedClassmateName} yet.</p>
+                  <p className="text-xs text-gray-500 mt-1">There are no payment records associated with {activeDisplayName} yet.</p>
                 </div>
               )}
             </div>
@@ -486,7 +520,7 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                   <div>
                     <h3 className="text-base font-bold text-gray-900">Complete Ledger Statement</h3>
-                    <p className="text-xs text-gray-500">All recorded financial contributions for {selectedClassmateName}</p>
+                    <p className="text-xs text-gray-500">All recorded financial contributions for {activeDisplayName}</p>
                   </div>
                   <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-xl border border-gray-200">
                     <span className="text-xs font-bold text-gray-500">Cumulative Total:</span>
@@ -547,7 +581,7 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
             <div className="max-w-2xl mx-auto bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-5">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Email Receipt &amp; Share Link</h3>
-                <p className="text-xs text-gray-500 mt-0.5">Send a detailed payment receipt directly to {selectedClassmateName} or copy the statement text &amp; URL.</p>
+                <p className="text-xs text-gray-500 mt-0.5">Send a detailed payment receipt directly to {activeDisplayName} or copy the statement text &amp; URL.</p>
               </div>
 
               <div className="space-y-4 text-sm">
@@ -564,7 +598,7 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
                   />
                   {!recipientEmail && (
                     <p className="text-[11px] text-amber-600 mt-1">
-                      ⚠️ No email registered for {selectedClassmateName}. Enter an email above to send directly via mail client.
+                      ⚠️ No email registered for {activeDisplayName}. Enter an email above to send directly via mail client.
                     </p>
                   )}
                 </div>
@@ -659,7 +693,7 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
 
         {/* Modal Footer */}
         <div className="bg-white border-t border-gray-200 px-6 py-3 flex justify-between items-center text-xs text-gray-500">
-          <span>Viewing: <strong>{selectedClassmateName}</strong></span>
+          <span>Viewing: <strong>{activeDisplayName}</strong></span>
           <button
             onClick={onClose}
             className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-5 py-2 rounded-xl font-bold transition-colors"
