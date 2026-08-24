@@ -5,7 +5,6 @@ import { PaymentCategory, Transaction, PaymentType, IntegrationSettings, Announc
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import ClassmateInput from './ClassmateInput';
-import ReceiptDashboardModal from './ReceiptDashboardModal';
 
 type BulkEditData = {
   category?: PaymentCategory;
@@ -21,7 +20,8 @@ const Admin: React.FC = () => {
     currentClassId, migrateLegacyData, deleteClassLedger,
     transactions, classmates, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, 
     logo, setLogo, subtitle, setSubtitle, integrationSettings, updateIntegrationSettings,
-    announcements, addAnnouncement, deleteAnnouncement, uploadTransactionAttachment
+    announcements, addAnnouncement, deleteAnnouncement, uploadTransactionAttachment,
+    openReceiptDashboard
   } = useData();
   
   const isReadOnly = user?.role === 'Admin_ro';
@@ -60,35 +60,14 @@ const Admin: React.FC = () => {
   const [bulkEditData, setBulkEditData] = useState<BulkEditData>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  // Receipt Dashboard State
-  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
-  const [receiptClassmateName, setReceiptClassmateName] = useState('');
-  const [receiptInitialTxId, setReceiptInitialTxId] = useState<string | undefined>();
-
-  const openReceiptDashboard = (classmateName: string, initialTxId?: string) => {
-    setReceiptClassmateName(classmateName);
-    setReceiptInitialTxId(initialTxId);
-    setReceiptModalOpen(true);
-  };
-
   const handleOpenBulkReceiptDashboard = () => {
     if (selectedTransactions.size === 0) return;
     const selectedTxIds = Array.from(selectedTransactions);
     const firstTx = transactions.find(t => t.id === selectedTxIds[0]);
     if (firstTx && firstTx.classmateName) {
-      openReceiptDashboard(firstTx.classmateName, firstTx.id);
+      openReceiptDashboard?.(firstTx.classmateName, firstTx.id);
     }
   };
-
-  // Check URL query parameters for direct receipt link opening
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const cm = params.get('classmate');
-    const txId = params.get('txId');
-    if (cm) {
-      openReceiptDashboard(cm, txId || undefined);
-    }
-  }, []);
 
   // Duplicate Schedule State
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
@@ -1305,18 +1284,6 @@ const Admin: React.FC = () => {
           </div>
         </div>
       )}
-
-      <ReceiptDashboardModal
-        isOpen={receiptModalOpen}
-        onClose={() => setReceiptModalOpen(false)}
-        classmateName={receiptClassmateName}
-        initialTransactionId={receiptInitialTxId}
-        classmates={classmates}
-        transactions={transactions}
-        logo={logo}
-        subtitle={subtitle}
-        currentClassId={currentClassId}
-      />
     </div>
   );
 };

@@ -121,7 +121,7 @@ const MergeClassmatesModal: React.FC<{
 
 
 const Classmates: React.FC = () => {
-    const { user, classmates, updateClassmate, mergeClassmates, deleteClassmates, updateClassmatesStatus, reconcileDuplicateClassmates } = useData();
+    const { user, classmates, updateClassmate, mergeClassmates, deleteClassmates, updateClassmatesStatus, reconcileDuplicateClassmates, openReceiptDashboard } = useData();
     const isReadOnly = user?.role === 'Admin_ro';
     
     const [editingClassmate, setEditingClassmate] = useState<Classmate | null>(null);
@@ -337,7 +337,7 @@ const Classmates: React.FC = () => {
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Home Address</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                                {!isReadOnly && <th scope="col" className="relative px-6 py-3"><span className="sr-only">Edit</span></th>}
+                                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -381,11 +381,18 @@ const Classmates: React.FC = () => {
                                             {classmate.role === 'Admin_ro' ? 'Read-Only Admin' : classmate.role}
                                         </span>
                                     </td>
-                                    {!isReadOnly && (
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button onClick={() => setEditingClassmate(classmate)} className="text-brand-secondary hover:text-brand-primary font-semibold">Edit</button>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+                                        <button
+                                            onClick={() => openReceiptDashboard?.(classmate.name)}
+                                            className="text-brand-primary hover:text-brand-secondary font-semibold text-xs inline-flex items-center gap-1"
+                                            title="View Classmate Receipt Statement"
+                                        >
+                                            📄 Receipt
+                                        </button>
+                                        {!isReadOnly && (
+                                            <button onClick={() => setEditingClassmate(classmate)} className="text-brand-secondary hover:text-brand-primary font-semibold text-xs">Edit</button>
+                                        )}
                                     </td>
-                                    )}
                                 </tr>
                             ))}
                             {filteredClassmates.length === 0 && (

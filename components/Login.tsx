@@ -10,6 +10,13 @@ interface LoginProps {
 const Login: React.FC<LoginProps> = ({ onGuestLogin, onHelpClick }) => {
   const [isSigningIn, setIsSigningIn] = useState(false);
 
+  // Check if opened via a direct Receipt or Classmate Statement link
+  const queryParams = new URLSearchParams(window.location.search);
+  const targetClassId = queryParams.get('classId');
+  const targetClassmate = queryParams.get('classmate');
+  const targetTxId = queryParams.get('txId');
+  const isReceiptLink = Boolean(targetClassmate || targetTxId || targetClassId);
+
   const handleSignInClick = async () => {
     if (isSigningIn) return;
     setIsSigningIn(true);
@@ -62,7 +69,29 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin, onHelpClick }) => {
                     <p className="mt-6 text-base text-gray-500 sm:mt-8 sm:text-lg sm:max-w-xl sm:mx-auto md:mt-8 md:text-xl lg:mx-0">
                         Simplify dues collection, track expenses with total transparency, and keep your classmates connected. The professional ledger built specifically for your reunion committee.
                     </p>
-                    <div className="mt-10 sm:max-w-lg sm:mx-auto sm:text-center lg:text-left lg:mx-0">
+                    {isReceiptLink && targetClassmate && (
+                      <div className="mt-6 p-4 bg-emerald-50 border-2 border-emerald-500/30 rounded-2xl shadow-sm text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">📄</span>
+                          <div>
+                            <p className="text-xs uppercase tracking-widest font-extrabold text-emerald-800">Direct Classmate Receipt Link</p>
+                            <p className="text-sm font-bold text-gray-900 mt-0.5">
+                              Statement for <span className="text-emerald-700">{targetClassmate}</span>
+                              {targetClassId && <span className="text-gray-500 font-normal"> (Ledger: {targetClassId})</span>}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={onGuestLogin}
+                          className="mt-3 w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2"
+                        >
+                          <span>Open {targetClassmate}'s Receipt Now</span>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="mt-8 sm:max-w-lg sm:mx-auto sm:text-center lg:text-left lg:mx-0">
                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <button
                                 onClick={handleSignInClick}

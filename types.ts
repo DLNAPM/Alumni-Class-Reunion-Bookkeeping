@@ -115,4 +115,5 @@ export interface DataContextType {
   deleteClassmates: (classmateIds: string[]) => Promise<string | null>;
   updateClassmatesStatus: (classmateIds: string[], status: 'Active' | 'Inactive') => Promise<void>;
   reconcileDuplicateClassmates: () => Promise<void>;
+  openReceiptDashboard?: (classmateName: string, initialTxId?: string) => void;
 }

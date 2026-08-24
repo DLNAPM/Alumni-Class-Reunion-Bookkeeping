@@ -12,6 +12,7 @@ import Header from './components/Header';
 import Profile from './components/Profile';
 import Classmates from './components/Classmates';
 import HelpModal from './components/HelpModal';
+import ReceiptDashboardModal from './components/ReceiptDashboardModal';
 import { auth, db, storage, FirebaseUser, Timestamp } from './firebase';
 import type { User, Transaction, Announcement, IntegrationSettings, IntegrationService, Classmate, UserRole } from './types';
 import firebase from 'firebase/compat/app';
@@ -31,6 +32,26 @@ const App: React.FC = () => {
   const [inputClassId, setInputClassId] = useState('');
   const [userClasses, setUserClasses] = useState<string[]>([]);
 
+  // Receipt Dashboard Deep-Link / Global State
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [receiptClassmateName, setReceiptClassmateName] = useState('');
+  const [receiptInitialTxId, setReceiptInitialTxId] = useState<string | undefined>();
+
+  const openReceiptDashboard = useCallback((classmateName: string, initialTxId?: string) => {
+    setReceiptClassmateName(classmateName);
+    setReceiptInitialTxId(initialTxId);
+    setReceiptModalOpen(true);
+  }, []);
+
+  const handleCloseReceiptModal = useCallback(() => {
+    setReceiptModalOpen(false);
+    // Tidy URL params if opened via deep link without reloading the page
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('classmate') || params.has('txId')) {
+      const cleanUrl = window.location.pathname + (currentClassId ? `?classId=${encodeURIComponent(currentClassId)}` : '');
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+  }, [currentClassId]);
 
   // App State
   const [user, setUser] = useState<User | null>(null);
@@ -57,8 +78,39 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // ===============================================================================================
-  // 1. Authentication Logic
+  // 1. Authentication & Deep Link Logic
   // ===============================================================================================
+
+  // Auto-detect classId and classmate receipt parameters on initial load
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlClassId = params.get('classId')?.trim().toUpperCase();
+    const urlClassmate = params.get('classmate')?.trim();
+    const urlTxId = params.get('txId')?.trim();
+
+    if (urlClassId && !currentClassId) {
+      setCurrentClassId(urlClassId);
+      setIsSelectingClass(false);
+    }
+
+    if (urlClassmate) {
+      setReceiptClassmateName(urlClassmate);
+      setReceiptInitialTxId(urlTxId || undefined);
+    }
+  }, []);
+
+  // When transactions / classmates finish loading, automatically trigger deep-linked receipt dashboard
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlClassmate = params.get('classmate')?.trim();
+    const urlTxId = params.get('txId')?.trim();
+
+    if (urlClassmate && currentClassId && (user || firebaseUser)) {
+      setReceiptClassmateName(urlClassmate);
+      setReceiptInitialTxId(urlTxId || undefined);
+      setReceiptModalOpen(true);
+    }
+  }, [currentClassId, user, firebaseUser]);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (u) => {
@@ -67,6 +119,16 @@ const App: React.FC = () => {
       setAuthError(null);
 
       if (u) {
+        // Check if explicit classId was provided in URL
+        const params = new URLSearchParams(window.location.search);
+        const urlClassId = params.get('classId')?.trim().toUpperCase();
+
+        if (urlClassId) {
+          setCurrentClassId(urlClassId);
+          setIsSelectingClass(false);
+          return;
+        }
+
         // User is logged in, check for class associations
         const email = u.email?.toLowerCase() || '';
         const isSuperAdmin = email === SUPER_ADMIN_EMAIL.toLowerCase();
@@ -96,7 +158,13 @@ const App: React.FC = () => {
       } else {
         // Logged out
         setUser(null);
-        setCurrentClassId('');
+        const params = new URLSearchParams(window.location.search);
+        const urlClassId = params.get('classId')?.trim().toUpperCase();
+        if (urlClassId) {
+          setCurrentClassId(urlClassId);
+        } else {
+          setCurrentClassId('');
+        }
         setIsSelectingClass(false);
       }
     });
@@ -127,15 +195,28 @@ const App: React.FC = () => {
   };
 
   const handleGuestLogin = () => {
+    const params = new URLSearchParams(window.location.search);
+    const urlClassId = params.get('classId')?.trim().toUpperCase();
+    const urlClassmate = params.get('classmate')?.trim();
+    const urlTxId = params.get('txId')?.trim();
+
+    const targetClassId = urlClassId || 'DEMO';
     const guestUser: User = {
       id: 'guest',
-      name: 'Guest User',
+      name: urlClassmate || 'Guest User',
       email: '',
       isAdmin: false,
       role: 'Guest',
     };
     setUser(guestUser);
-    setCurrentClassId('DEMO'); // Default class for guests
+    setCurrentClassId(targetClassId);
+    setIsSelectingClass(false);
+
+    if (urlClassmate) {
+      setReceiptClassmateName(urlClassmate);
+      setReceiptInitialTxId(urlTxId || undefined);
+      setReceiptModalOpen(true);
+    }
   };
 
   const handleLogout = async () => {
@@ -848,7 +929,8 @@ const App: React.FC = () => {
       mergeClassmates,
       deleteClassmates,
       updateClassmatesStatus,
-      reconcileDuplicateClassmates
+      reconcileDuplicateClassmates,
+      openReceiptDashboard
     }}>
       <div className="min-h-screen bg-brand-background flex flex-col lg:flex-row">
         <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} onLogout={handleLogout} />
@@ -874,6 +956,17 @@ const App: React.FC = () => {
         </div>
       </div>
       <HelpModal isOpen={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} />
+      <ReceiptDashboardModal
+        isOpen={receiptModalOpen}
+        onClose={handleCloseReceiptModal}
+        classmateName={receiptClassmateName}
+        initialTransactionId={receiptInitialTxId}
+        classmates={classmates}
+        transactions={transactions}
+        logo={logo}
+        subtitle={subtitle}
+        currentClassId={currentClassId}
+      />
     </DataProvider>
   );
 };

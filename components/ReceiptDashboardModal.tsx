@@ -27,14 +27,18 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
 }) => {
   const { user } = useData();
   const isAdmin = Boolean(user?.isAdmin || user?.role === 'Admin');
+  const isGuest = user?.role === 'Guest';
+  const isStandardClassmate = Boolean(user && !isAdmin && !isGuest && user.name);
 
-  // Non-admin classmates are strictly locked to their own registered user name
+  // Determine which classmate name to display:
+  // - If standard logged-in classmate: must match their own profile (or user.name)
+  // - If admin or guest / public receipt link viewer: uses initialClassmateName (e.g. "Perry, Samuel")
   const effectiveClassmateName = useMemo(() => {
-    if (!isAdmin && user?.name) {
+    if (isStandardClassmate && user?.name) {
       return user.name;
     }
     return initialClassmateName || user?.name || '';
-  }, [isAdmin, user?.name, initialClassmateName]);
+  }, [isStandardClassmate, user?.name, initialClassmateName]);
 
   const [selectedClassmateName, setSelectedClassmateName] = useState<string>(effectiveClassmateName);
   const [selectedTxId, setSelectedTxId] = useState<string | undefined>(initialTransactionId);
@@ -49,22 +53,22 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
 
   // Sync selected classmate when props change or modal opens
   React.useEffect(() => {
-    if (!isAdmin && user?.name) {
+    if (isStandardClassmate && user?.name) {
       setSelectedClassmateName(user.name);
     } else {
       setSelectedClassmateName(initialClassmateName || user?.name || '');
     }
     setSelectedTxId(initialTransactionId);
-  }, [initialClassmateName, initialTransactionId, isOpen, isAdmin, user?.name]);
+  }, [initialClassmateName, initialTransactionId, isOpen, isStandardClassmate, user?.name]);
 
   // Find classmate profile
   const classmateProfile = useMemo(() => {
-    const targetName = !isAdmin && user?.name ? user.name : selectedClassmateName;
+    const targetName = isStandardClassmate && user?.name ? user.name : selectedClassmateName;
     if (!targetName) return null;
     return classmates.find(
       c => c.name.trim().toLowerCase() === targetName.trim().toLowerCase()
     );
-  }, [classmates, selectedClassmateName, isAdmin, user?.name]);
+  }, [classmates, selectedClassmateName, isStandardClassmate, user?.name]);
 
   // Update default recipient email when classmate profile loads
   React.useEffect(() => {
@@ -77,13 +81,13 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
 
   // Classmate's transactions - strictly limited to logged-in classmate if not admin
   const classmateTxs = useMemo(() => {
-    const targetName = !isAdmin && user?.name ? user.name : selectedClassmateName;
+    const targetName = isStandardClassmate && user?.name ? user.name : selectedClassmateName;
     if (!targetName) return [];
     const normName = targetName.trim().toLowerCase();
     return transactions.filter(
       t => t.classmateName && t.classmateName.trim().toLowerCase() === normName
     ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, selectedClassmateName, isAdmin, user?.name]);
+  }, [transactions, selectedClassmateName, isStandardClassmate, user?.name]);
 
   // Selected Transaction for individual receipt
   const selectedTx = useMemo(() => {
@@ -114,28 +118,30 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
     return { total, dues, donations, events, other, count: classmateTxs.length };
   }, [classmateTxs]);
 
+  const activeDisplayName = isStandardClassmate && user?.name ? user.name : selectedClassmateName;
+
   // Generate Shareable URL
   const shareableUrl = useMemo(() => {
     const origin = window.location.origin + window.location.pathname;
     const params = new URLSearchParams();
-    const activeName = !isAdmin && user?.name ? user.name : selectedClassmateName;
+    const activeName = activeDisplayName;
     if (currentClassId) params.set('classId', currentClassId);
     if (activeName) params.set('classmate', activeName);
     if (selectedTx) params.set('txId', selectedTx.id);
     return `${origin}?${params.toString()}`;
-  }, [currentClassId, selectedClassmateName, selectedTx, isAdmin, user?.name]);
+  }, [currentClassId, activeDisplayName, selectedTx]);
 
   // Update default email subject when selectedTx or classmateName changes
   React.useEffect(() => {
-    const activeName = !isAdmin && user?.name ? user.name : selectedClassmateName;
+    const activeName = activeDisplayName;
     const txDesc = selectedTx ? `Receipt #${selectedTx.id.slice(0, 8).toUpperCase()}` : 'Statement';
     setEmailSubject(`[${subtitle || 'Class Ledger'}] Official Payment ${txDesc} - ${activeName}`);
-  }, [selectedTx, selectedClassmateName, subtitle, isAdmin, user?.name]);
+  }, [selectedTx, activeDisplayName, subtitle]);
 
   // Distinct classmate list for dropdown selector (only available to Admins)
   const allClassmateNames = useMemo(() => {
     if (!isAdmin) {
-      return user?.name ? [user.name] : [];
+      return activeDisplayName ? [activeDisplayName] : [];
     }
     return Array.from(
       new Set([
@@ -143,9 +149,7 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
         ...transactions.map(t => t.classmateName)
       ])
     ).filter(Boolean).sort();
-  }, [isAdmin, user?.name, classmates, transactions]);
-
-  const activeDisplayName = !isAdmin && user?.name ? user.name : selectedClassmateName;
+  }, [isAdmin, activeDisplayName, classmates, transactions]);
 
   const formatMoney = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);

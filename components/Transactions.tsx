@@ -2,14 +2,11 @@
 import React, { useState, useMemo } from 'react';
 import { useData } from '../context/DataContext';
 import { PaymentCategory, Transaction } from '../types';
-import ReceiptDashboardModal from './ReceiptDashboardModal';
 
 const Transactions: React.FC = () => {
-  const { transactions, user, classmates, logo, subtitle, currentClassId } = useData();
+  const { transactions, user, openReceiptDashboard } = useData();
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [sortConfig, setSortConfig] = useState<{ key: keyof Transaction; direction: 'asc' | 'desc' } | null>({ key: 'date', direction: 'desc' });
-  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
-  const [receiptTxId, setReceiptTxId] = useState<string | undefined>();
 
   const userTransactions = useMemo(() => {
     if (!user?.name) {
@@ -68,10 +65,7 @@ const Transactions: React.FC = () => {
         <div className="mt-4 sm:mt-0 flex items-center gap-3 flex-wrap">
           {user?.name && (
             <button
-              onClick={() => {
-                setReceiptTxId(undefined);
-                setReceiptModalOpen(true);
-              }}
+              onClick={() => openReceiptDashboard?.(user.name)}
               className="bg-brand-primary text-white hover:bg-brand-secondary text-xs font-bold px-4 py-2 rounded-lg shadow-xs transition-colors flex items-center gap-1.5"
             >
               📄 Open Receipt Dashboard
@@ -121,10 +115,7 @@ const Transactions: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button
-                    onClick={() => {
-                      setReceiptTxId(transaction.id);
-                      setReceiptModalOpen(true);
-                    }}
+                    onClick={() => openReceiptDashboard?.(user?.name || transaction.classmateName || '', transaction.id)}
                     className="text-brand-primary hover:text-brand-secondary font-semibold text-xs inline-flex items-center gap-1"
                   >
                     📄 Receipt
@@ -140,18 +131,6 @@ const Transactions: React.FC = () => {
           </tbody>
         </table>
       </div>
-
-      <ReceiptDashboardModal
-        isOpen={receiptModalOpen}
-        onClose={() => setReceiptModalOpen(false)}
-        classmateName={user?.name || ''}
-        initialTransactionId={receiptTxId}
-        classmates={classmates}
-        transactions={transactions}
-        logo={logo}
-        subtitle={subtitle}
-        currentClassId={currentClassId}
-      />
     </div>
   );
 };
