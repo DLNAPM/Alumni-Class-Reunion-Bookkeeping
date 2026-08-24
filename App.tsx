@@ -212,8 +212,8 @@ const App: React.FC = () => {
     setCurrentClassId(targetClassId);
     setIsSelectingClass(false);
 
-    if (urlClassmate) {
-      setReceiptClassmateName(urlClassmate);
+    if (urlClassmate || urlTxId) {
+      setReceiptClassmateName(urlClassmate || '');
       setReceiptInitialTxId(urlTxId || undefined);
       setReceiptModalOpen(true);
     }

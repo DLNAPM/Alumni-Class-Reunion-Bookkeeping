@@ -1,6 +1,42 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction, Classmate, PaymentCategory } from '../types';
 import { useData } from '../context/DataContext';
+
+// Helper: Normalize name into lowercase alphanumeric tokens for flexible comparison (order-independent)
+export const normalizeNameTokens = (name?: string): string[] => {
+  if (!name) return [];
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/gi, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+};
+
+// Helper: Compare two names flexibly (handles "Last, First" vs "First Last", punctuation, middle names)
+export const areNamesMatching = (nameA?: string, nameB?: string): boolean => {
+  if (!nameA || !nameB) return false;
+  const a = nameA.trim().toLowerCase();
+  const b = nameB.trim().toLowerCase();
+  if (a === b) return true;
+
+  const tokensA = normalizeNameTokens(a);
+  const tokensB = normalizeNameTokens(b);
+  if (tokensA.length === 0 || tokensB.length === 0) return false;
+
+  const sortedA = [...tokensA].sort().join(' ');
+  const sortedB = [...tokensB].sort().join(' ');
+  if (sortedA === sortedB) return true;
+
+  // Check token set overlap for names with titles or middle initials (e.g. "Samuel Perry" vs "Samuel E. Perry")
+  const setB = new Set(tokensB);
+  const common = tokensA.filter(t => setB.has(t));
+  if (common.length >= 2 && (common.length === tokensA.length || common.length === tokensB.length)) {
+    return true;
+  }
+
+  return false;
+};
 
 interface ReceiptDashboardModalProps {
   isOpen: boolean;
@@ -25,22 +61,31 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
   subtitle,
   currentClassId,
 }) => {
-  const { user } = useData();
+  const { user, isLoading } = useData();
   const isAdmin = Boolean(user?.isAdmin || user?.role === 'Admin');
   const isGuest = user?.role === 'Guest';
   const isStandardClassmate = Boolean(user && !isAdmin && !isGuest && user.name);
 
-  // Determine which classmate name to display:
-  // - If standard logged-in classmate: must match their own profile (or user.name)
-  // - If admin or guest / public receipt link viewer: uses initialClassmateName (e.g. "Perry, Samuel")
-  const effectiveClassmateName = useMemo(() => {
+  // 1. If an initialTransactionId is provided in the URL or props, locate that specific transaction directly
+  const directTx = useMemo(() => {
+    if (initialTransactionId) {
+      return transactions.find(t => t.id === initialTransactionId);
+    }
+    return null;
+  }, [transactions, initialTransactionId]);
+
+  // Determine initial selected classmate name
+  const effectiveInitialName = useMemo(() => {
+    if (directTx?.classmateName) {
+      return directTx.classmateName;
+    }
     if (isStandardClassmate && user?.name) {
       return user.name;
     }
     return initialClassmateName || user?.name || '';
-  }, [isStandardClassmate, user?.name, initialClassmateName]);
+  }, [directTx, isStandardClassmate, user?.name, initialClassmateName]);
 
-  const [selectedClassmateName, setSelectedClassmateName] = useState<string>(effectiveClassmateName);
+  const [selectedClassmateName, setSelectedClassmateName] = useState<string>(effectiveInitialName);
   const [selectedTxId, setSelectedTxId] = useState<string | undefined>(initialTransactionId);
   const [activeTab, setActiveTab] = useState<'receipt' | 'history' | 'email'>('receipt');
   
@@ -51,27 +96,35 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
 
-  // Sync selected classmate when props change or modal opens
-  React.useEffect(() => {
-    if (isStandardClassmate && user?.name) {
+  // Sync selected classmate and tx when props or directTx change
+  useEffect(() => {
+    if (directTx?.classmateName) {
+      setSelectedClassmateName(directTx.classmateName);
+    } else if (isStandardClassmate && user?.name) {
       setSelectedClassmateName(user.name);
-    } else {
-      setSelectedClassmateName(initialClassmateName || user?.name || '');
+    } else if (initialClassmateName) {
+      setSelectedClassmateName(initialClassmateName);
     }
-    setSelectedTxId(initialTransactionId);
-  }, [initialClassmateName, initialTransactionId, isOpen, isStandardClassmate, user?.name]);
+    if (initialTransactionId) {
+      setSelectedTxId(initialTransactionId);
+    }
+  }, [initialClassmateName, initialTransactionId, directTx, isOpen, isStandardClassmate, user?.name]);
 
-  // Find classmate profile
+  // Find classmate profile with flexible matching
   const classmateProfile = useMemo(() => {
     const targetName = isStandardClassmate && user?.name ? user.name : selectedClassmateName;
-    if (!targetName) return null;
-    return classmates.find(
-      c => c.name.trim().toLowerCase() === targetName.trim().toLowerCase()
+    if (!targetName && !directTx?.classmateName) return null;
+    
+    // Exact or flexible match
+    return (
+      classmates.find(c => targetName && areNamesMatching(c.name, targetName)) ||
+      classmates.find(c => directTx && areNamesMatching(c.name, directTx.classmateName)) ||
+      null
     );
-  }, [classmates, selectedClassmateName, isStandardClassmate, user?.name]);
+  }, [classmates, selectedClassmateName, isStandardClassmate, user?.name, directTx]);
 
   // Update default recipient email when classmate profile loads
-  React.useEffect(() => {
+  useEffect(() => {
     if (classmateProfile?.email) {
       setRecipientEmail(classmateProfile.email);
     } else {
@@ -79,24 +132,45 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
     }
   }, [classmateProfile]);
 
-  // Classmate's transactions - strictly limited to logged-in classmate if not admin
+  // Active display name
+  const activeDisplayName = useMemo(() => {
+    if (isStandardClassmate && user?.name) return user.name;
+    if (classmateProfile?.name) return classmateProfile.name;
+    if (directTx?.classmateName) return directTx.classmateName;
+    return selectedClassmateName || initialClassmateName || 'Classmate';
+  }, [isStandardClassmate, user?.name, classmateProfile, directTx, selectedClassmateName, initialClassmateName]);
+
+  // Classmate's transactions with flexible matching & direct ID resolution
   const classmateTxs = useMemo(() => {
-    const targetName = isStandardClassmate && user?.name ? user.name : selectedClassmateName;
-    if (!targetName) return [];
-    const normName = targetName.trim().toLowerCase();
-    return transactions.filter(
-      t => t.classmateName && t.classmateName.trim().toLowerCase() === normName
-    ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, selectedClassmateName, isStandardClassmate, user?.name]);
+    const targetName = isStandardClassmate && user?.name ? user.name : (selectedClassmateName || initialClassmateName);
+    const directClassmateName = directTx?.classmateName;
+    const profileName = classmateProfile?.name;
+
+    return transactions.filter(t => {
+      // 1. Direct ID match
+      if (initialTransactionId && t.id === initialTransactionId) return true;
+      if (selectedTxId && t.id === selectedTxId) return true;
+
+      // 2. Flexible name matching across target name, direct transaction name, and profile name
+      if (targetName && areNamesMatching(t.classmateName, targetName)) return true;
+      if (directClassmateName && areNamesMatching(t.classmateName, directClassmateName)) return true;
+      if (profileName && areNamesMatching(t.classmateName, profileName)) return true;
+
+      return false;
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [transactions, selectedClassmateName, initialClassmateName, isStandardClassmate, user?.name, directTx, classmateProfile, initialTransactionId, selectedTxId]);
 
   // Selected Transaction for individual receipt
   const selectedTx = useMemo(() => {
     if (selectedTxId) {
-      const found = classmateTxs.find(t => t.id === selectedTxId);
-      if (found) return found;
+      const foundInList = classmateTxs.find(t => t.id === selectedTxId);
+      if (foundInList) return foundInList;
+      const foundInAll = transactions.find(t => t.id === selectedTxId);
+      if (foundInAll) return foundInAll;
     }
+    if (directTx) return directTx;
     return classmateTxs[0] || null;
-  }, [classmateTxs, selectedTxId]);
+  }, [classmateTxs, selectedTxId, directTx, transactions]);
 
   // Financial Summary Metrics
   const summary = useMemo(() => {
@@ -118,8 +192,6 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
     return { total, dues, donations, events, other, count: classmateTxs.length };
   }, [classmateTxs]);
 
-  const activeDisplayName = isStandardClassmate && user?.name ? user.name : selectedClassmateName;
-
   // Generate Shareable URL
   const shareableUrl = useMemo(() => {
     const origin = window.location.origin + window.location.pathname;
@@ -132,7 +204,7 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
   }, [currentClassId, activeDisplayName, selectedTx]);
 
   // Update default email subject when selectedTx or classmateName changes
-  React.useEffect(() => {
+  useEffect(() => {
     const activeName = activeDisplayName;
     const txDesc = selectedTx ? `Receipt #${selectedTx.id.slice(0, 8).toUpperCase()}` : 'Statement';
     setEmailSubject(`[${subtitle || 'Class Ledger'}] Official Payment ${txDesc} - ${activeName}`);
@@ -407,7 +479,13 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
                 </div>
               )}
 
-              {selectedTx ? (
+              {isLoading && transactions.length === 0 ? (
+                <div className="bg-white p-12 text-center rounded-2xl border border-gray-200 shadow-sm">
+                  <div className="w-8 h-8 border-3 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                  <h4 className="text-base font-bold text-gray-800">Loading Payment Records...</h4>
+                  <p className="text-xs text-gray-500 mt-1">Retrieving verified receipts from class ledger {currentClassId}</p>
+                </div>
+              ) : selectedTx ? (
                 <div id="printable-receipt" className="bg-white rounded-2xl border-2 border-gray-200 shadow-lg p-6 sm:p-8 relative overflow-hidden">
                   {/* Decorative Watermark Stamp */}
                   <div className="absolute -right-10 -bottom-10 opacity-[0.04] pointer-events-none select-none">
