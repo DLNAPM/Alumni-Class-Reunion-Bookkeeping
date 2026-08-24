@@ -139,9 +139,20 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    await auth.signOut();
+    try {
+      await auth.signOut();
+    } catch (err) {
+      console.error("Sign out error:", err);
+    }
+    setUser(null);
+    setFirebaseUser(null);
+    setCurrentClassId('');
+    setIsSelectingClass(false);
+    setUserClasses([]);
     setCurrentPage('dashboard');
-    window.location.reload();
+    try {
+      sessionStorage.clear();
+    } catch (_) {}
   };
 
   // ===============================================================================================

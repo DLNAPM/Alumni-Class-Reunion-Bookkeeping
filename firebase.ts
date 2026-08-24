@@ -33,6 +33,9 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
 const googleProvider = new firebase.auth.GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 const Timestamp = firebase.firestore.Timestamp;
 
 // Export everything needed by the app

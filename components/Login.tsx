@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { auth, googleProvider } from '../firebase';
 
 interface LoginProps {
@@ -8,13 +8,27 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onGuestLogin, onHelpClick }) => {
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
   const handleSignInClick = async () => {
+    if (isSigningIn) return;
+    setIsSigningIn(true);
     try {
+      googleProvider.setCustomParameters({ prompt: 'select_account' });
       await auth.signInWithPopup(googleProvider);
-    } catch (error) {
+    } catch (error: any) {
+      if (
+        error?.code === 'auth/popup-closed-by-user' ||
+        error?.code === 'auth/cancelled-popup-request' ||
+        error?.code === 'auth/user-cancelled'
+      ) {
+        // User voluntarily closed the popup; no need to display error
+        return;
+      }
       console.error("Error signing in with Google:", error);
-      alert("An error occurred during sign-in. Please try again.");
+      alert(error?.message || "An error occurred during sign-in. Please try again.");
+    } finally {
+      setIsSigningIn(false);
     }
   };
 
@@ -52,12 +66,22 @@ const Login: React.FC<LoginProps> = ({ onGuestLogin, onHelpClick }) => {
                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <button
                                 onClick={handleSignInClick}
-                                className="flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-white bg-brand-primary hover:bg-brand-secondary shadow-xl transition-all hover:scale-105 active:scale-95"
+                                disabled={isSigningIn}
+                                className="flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-white bg-brand-primary hover:bg-brand-secondary shadow-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-75 disabled:cursor-not-allowed disabled:hover:scale-100"
                             >
-                                <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
-                                    <path fill="currentColor" d="M21.35,11.1H12.18V13.83H18.69C18.36,17.64 15.19,19.27 12.19,19.27C8.36,19.27 5,16.25 5,12C5,7.9 8.2,4.73 12.2,4.73C15.29,4.73 17.1,6.7 17.1,6.7L19,4.72C19,4.72 16.56,2 12.1,2C6.42,2 2.03,6.8 2.03,12C2.03,17.05 6.16,22 12.25,22C17.6,22 21.5,18.33 21.5,12.91C21.5,11.76 21.35,11.1 21.35,11.1V11.1Z" />
-                                </svg>
-                                Sign in with Google
+                                {isSigningIn ? (
+                                    <>
+                                        <div className="w-5 h-5 mr-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        Connecting...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
+                                            <path fill="currentColor" d="M21.35,11.1H12.18V13.83H18.69C18.36,17.64 15.19,19.27 12.19,19.27C8.36,19.27 5,16.25 5,12C5,7.9 8.2,4.73 12.2,4.73C15.29,4.73 17.1,6.7 17.1,6.7L19,4.72C19,4.72 16.56,2 12.1,2C6.42,2 2.03,6.8 2.03,12C2.03,17.05 6.16,22 12.25,22C17.6,22 21.5,18.33 21.5,12.91C21.5,11.76 21.35,11.1 21.35,11.1V11.1Z" />
+                                        </svg>
+                                        Sign in with Google
+                                    </>
+                                )}
                             </button>
                              <button
                                 onClick={onGuestLogin}
