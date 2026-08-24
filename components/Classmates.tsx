@@ -122,7 +122,29 @@ const MergeClassmatesModal: React.FC<{
 
 const Classmates: React.FC = () => {
     const { user, classmates, updateClassmate, mergeClassmates, deleteClassmates, updateClassmatesStatus, reconcileDuplicateClassmates, openReceiptDashboard } = useData();
+    const isAdmin = user?.role === 'Admin' || user?.isAdmin || user?.role === 'Admin_ro';
     const isReadOnly = user?.role === 'Admin_ro';
+
+    if (!isAdmin) {
+        return (
+            <div className="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-md border border-gray-100 text-center">
+                <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+                    🔒
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Classmate Directory Restricted</h3>
+                <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+                    To protect classmate privacy, contact numbers and home addresses are visible only to verified Class Administrators.
+                    You can view and update your own contact and address details under <strong>My Profile</strong>.
+                </p>
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-left text-xs text-gray-600 space-y-1">
+                    <p><strong>Your Name:</strong> {user?.name}</p>
+                    <p><strong>Your Email:</strong> {user?.email}</p>
+                    <p><strong>Your Contact Number:</strong> {user?.phone || 'Not set'}</p>
+                    <p><strong>Your Home Address:</strong> {user?.address || 'Not set'}</p>
+                </div>
+            </div>
+        );
+    }
     
     const [editingClassmate, setEditingClassmate] = useState<Classmate | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());

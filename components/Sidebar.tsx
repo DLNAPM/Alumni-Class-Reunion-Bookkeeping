@@ -31,7 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, onLogout
     { name: 'dashboard', label: 'Dashboard', icon: <DashboardIcon />, roles: ['Admin', 'Standard', 'Guest', 'Admin_ro'] },
     { name: 'payment', label: 'Make a Payment', icon: <PaymentIcon />, roles: ['Admin'] },
     { name: 'transactions', label: 'My Transactions', icon: <TransactionsIcon />, roles: ['Admin', 'Standard', 'Admin_ro'] },
-    { name: 'profile', label: 'My Profile', icon: <ProfileIcon />, roles: ['Admin', 'Admin_ro'] },
+    { name: 'profile', label: 'My Profile', icon: <ProfileIcon />, roles: ['Admin', 'Standard', 'Admin_ro'] },
     { name: 'admin', label: 'Admin Panel', icon: <AdminIcon />, roles: ['Admin', 'Admin_ro'] },
     { name: 'classmates', label: 'Classmates', icon: <ClassmatesIcon />, roles: ['Admin', 'Admin_ro'] },
     { name: 'reporting', label: 'Reporting', icon: <ReportingIcon />, roles: ['Admin', 'Admin_ro'] },

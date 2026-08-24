@@ -13,8 +13,10 @@ import Profile from './components/Profile';
 import Classmates from './components/Classmates';
 import HelpModal from './components/HelpModal';
 import ReceiptDashboardModal from './components/ReceiptDashboardModal';
+import ClassmateOnboardingModal from './components/ClassmateOnboardingModal';
 import { auth, db, storage, FirebaseUser, Timestamp } from './firebase';
 import type { User, Transaction, Announcement, IntegrationSettings, IntegrationService, Classmate, UserRole } from './types';
+import { formatToLastFirst, isNameMatch, deriveNameFromEmail } from './services/nameUtils';
 import firebase from 'firebase/compat/app';
 
 // Hardcoded Super Admin Email
@@ -66,6 +68,17 @@ const App: React.FC = () => {
   
   // Help Modal State
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+
+  // First-Time Login / Profile Onboarding Modal State
+  const [onboardingModal, setOnboardingModal] = useState<{
+    isOpen: boolean;
+    mode: 'merge' | 'create' | 'complete';
+    matchingClassmates: Classmate[];
+  }>({
+    isOpen: false,
+    mode: 'create',
+    matchingClassmates: [],
+  });
 
   // Integration Settings
   const [integrationSettings, setIntegrationSettings] = useState<IntegrationSettings>({
@@ -327,7 +340,7 @@ const App: React.FC = () => {
       return;
     }
 
-    let unsubscribe: () => void;
+    let unsubscribe: (() => void) | undefined;
 
     const fetchUserProfile = async () => {
       const email = firebaseUser.email?.toLowerCase() || '';
@@ -360,64 +373,97 @@ const App: React.FC = () => {
         return;
       }
 
-      // 2. For regular users, find their Classmate record in current class
+      // 2. For regular users, find and match their Classmate record in current class
       try {
-        unsubscribe = db.collection('classmates')
-          .where('email', '==', firebaseUser.email)
-          .where('classId', '==', currentClassId)
-          .limit(1)
-          .onSnapshot(async (snapshot) => {
-            if (!snapshot.empty) {
-              const doc = snapshot.docs[0];
-              const data = doc.data() as Classmate;
-              
-              if (data.status === 'Inactive') {
+        const allSnap = await db.collection('classmates').where('classId', '==', currentClassId).get();
+        const allClassmatesInClass = allSnap.docs.map(d => ({ id: d.id, ...d.data() } as Classmate));
+
+        const exactMatch = allClassmatesInClass.find(
+          c => c.email && c.email.toLowerCase() === email
+        );
+
+        if (exactMatch) {
+          if (exactMatch.status === 'Inactive') {
+            setAuthError("Your account has been deactivated by the administrator.");
+            setUser(null);
+            return;
+          }
+
+          setUser({
+            id: exactMatch.id,
+            name: exactMatch.name,
+            email: exactMatch.email || firebaseUser.email!,
+            isAdmin: exactMatch.role === 'Admin',
+            role: exactMatch.role,
+            address: exactMatch.address,
+            phone: exactMatch.phone,
+          });
+
+          // Check if there are other unmerged duplicate records matching their name in the ledger
+          const duplicateMatches = allClassmatesInClass.filter(
+            c => c.id !== exactMatch.id && isNameMatch(c.name, exactMatch.name)
+          );
+
+          if (duplicateMatches.length > 0) {
+            setOnboardingModal({
+              isOpen: true,
+              mode: 'merge',
+              matchingClassmates: [exactMatch, ...duplicateMatches],
+            });
+          } else if (!exactMatch.phone || !exactMatch.address) {
+            // Missing mandatory contact details
+            setOnboardingModal({
+              isOpen: true,
+              mode: 'complete',
+              matchingClassmates: [exactMatch],
+            });
+          }
+
+          // Listen for profile changes on this record
+          unsubscribe = db.collection('classmates')
+            .doc(exactMatch.id)
+            .onSnapshot(docSnap => {
+              if (docSnap.exists) {
+                const data = docSnap.data() as Classmate;
+                if (data.status === 'Inactive') {
                   setAuthError("Your account has been deactivated by the administrator.");
                   setUser(null);
                   return;
+                }
+                setUser({
+                  id: docSnap.id,
+                  name: data.name,
+                  email: data.email || firebaseUser.email!,
+                  isAdmin: data.role === 'Admin',
+                  role: data.role,
+                  address: data.address,
+                  phone: data.phone,
+                });
               }
+            });
+        } else {
+          // No profile found with this email: search for candidate matches by name
+          const candidateName = firebaseUser.displayName || deriveNameFromEmail(firebaseUser.email || '');
+          const matchingByName = allClassmatesInClass.filter(c => isNameMatch(c.name, candidateName));
 
-              setUser({
-                id: doc.id,
-                name: data.name,
-                email: data.email || firebaseUser.email!,
-                isAdmin: data.role === 'Admin',
-                role: data.role,
-                address: data.address,
-                phone: data.phone,
-              });
-            } else {
-              // Check if class is empty - if so, this user is the creator and Admin
-              const allClassmatesSnap = await db.collection('classmates').where('classId', '==', currentClassId).limit(1).get();
-              const isFirstUser = allClassmatesSnap.empty;
-              const role: UserRole = isFirstUser ? 'Admin' : 'Standard';
-
-              const newUser: User = {
-                id: firebaseUser.uid,
-                name: firebaseUser.displayName || 'New User',
-                email: firebaseUser.email!,
-                isAdmin: role === 'Admin',
-                role: role,
-              };
-              
-              setUser(newUser);
-
-              if (role === 'Admin') {
-                   await db.collection('classmates').add({
-                       name: newUser.name,
-                       email: newUser.email,
-                       role: 'Admin',
-                       status: 'Active',
-                       classId: currentClassId,
-                   });
-              }
-            }
-          }, error => {
-              console.error("Error listening to user profile:", error);
-              setAuthError("Failed to load user profile.");
-          });
+          if (matchingByName.length > 0) {
+            // Found 1 or more matching profiles in the ledger -> prompt to pick/merge
+            setOnboardingModal({
+              isOpen: true,
+              mode: 'merge',
+              matchingClassmates: matchingByName,
+            });
+          } else {
+            // No profile found -> prompt user to create new profile with mandatory fields
+            setOnboardingModal({
+              isOpen: true,
+              mode: 'create',
+              matchingClassmates: [],
+            });
+          }
+        }
       } catch (error) {
-        console.error("Error setting up profile listener:", error);
+        console.error("Error setting up profile lookup:", error);
       }
     };
 
@@ -427,6 +473,114 @@ const App: React.FC = () => {
       if (unsubscribe) unsubscribe();
     };
   }, [firebaseUser, currentClassId]);
+
+  const handleOnboardingComplete = async (data: {
+    targetClassmateId?: string;
+    mergedSourceIds: string[];
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+  }) => {
+    if (!currentClassId || !firebaseUser) return;
+    setIsLoading(true);
+
+    try {
+      const standardizedName = formatToLastFirst(data.name);
+      let activeUserId = data.targetClassmateId;
+
+      if (data.targetClassmateId) {
+        // Merge / link flow
+        const targetRef = db.collection('classmates').doc(data.targetClassmateId);
+        const targetSnap = await targetRef.get();
+        const oldTargetName = targetSnap.data()?.name || standardizedName;
+        const existingRole = targetSnap.data()?.role || 'Standard';
+
+        const allNamesToUpdate = new Set<string>([oldTargetName, standardizedName]);
+
+        const batch = db.batch();
+        batch.update(targetRef, {
+          name: standardizedName,
+          email: data.email,
+          phone: data.phone,
+          address: data.address,
+          status: 'Active',
+        });
+
+        if (data.mergedSourceIds && data.mergedSourceIds.length > 0) {
+          for (const sourceId of data.mergedSourceIds) {
+            const sourceDoc = await db.collection('classmates').doc(sourceId).get();
+            if (sourceDoc.exists) {
+              const sName = sourceDoc.data()?.name;
+              if (sName) allNamesToUpdate.add(sName);
+            }
+            batch.delete(db.collection('classmates').doc(sourceId));
+          }
+        }
+
+        // Update all associated ledger transactions to the standardized name
+        for (const oldName of allNamesToUpdate) {
+          const txSnap = await db.collection('transactions')
+            .where('classmateName', '==', oldName)
+            .where('classId', '==', currentClassId)
+            .get();
+          txSnap.docs.forEach(doc => {
+            batch.update(doc.ref, { classmateName: standardizedName });
+          });
+        }
+
+        await batch.commit();
+
+        const updatedUser: User = {
+          id: activeUserId || data.targetClassmateId,
+          name: standardizedName,
+          email: data.email,
+          isAdmin: existingRole === 'Admin',
+          role: existingRole,
+          phone: data.phone,
+          address: data.address,
+        };
+        setUser(updatedUser);
+      } else {
+        // Create new profile flow
+        const allSnap = await db.collection('classmates').where('classId', '==', currentClassId).limit(1).get();
+        const isFirstUser = allSnap.empty;
+        const role: UserRole = isFirstUser ? 'Admin' : 'Standard';
+
+        const newDoc = await db.collection('classmates').add({
+          name: standardizedName,
+          email: data.email,
+          phone: data.phone,
+          address: data.address,
+          status: 'Active',
+          role: role,
+          classId: currentClassId,
+        });
+        activeUserId = newDoc.id;
+
+        const newUser: User = {
+          id: activeUserId,
+          name: standardizedName,
+          email: data.email,
+          isAdmin: role === 'Admin',
+          role: role,
+          phone: data.phone,
+          address: data.address,
+        };
+        setUser(newUser);
+      }
+
+      setOnboardingModal(prev => ({ ...prev, isOpen: false }));
+
+      // Automatically open Classmate's Profile view so they can review their full details
+      setCurrentPage('profile');
+    } catch (error) {
+      console.error("Error completing classmate onboarding:", error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
 
   // Fetch Transactions
@@ -1035,6 +1189,23 @@ const App: React.FC = () => {
   }
 
   if (firebaseUser && !user) {
+    if (onboardingModal.isOpen) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+          <ClassmateOnboardingModal
+            isOpen={onboardingModal.isOpen}
+            mode={onboardingModal.mode}
+            matchingClassmates={onboardingModal.matchingClassmates}
+            currentUserEmail={firebaseUser.email || ''}
+            currentUserDisplayName={firebaseUser.displayName || ''}
+            currentClassId={currentClassId}
+            allTransactions={transactions}
+            onComplete={handleOnboardingComplete}
+            onClose={() => handleLogout()}
+          />
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen flex items-center justify-center bg-brand-background">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary"></div>
@@ -1110,6 +1281,17 @@ const App: React.FC = () => {
         logo={logo}
         subtitle={subtitle}
         currentClassId={currentClassId}
+      />
+      <ClassmateOnboardingModal
+        isOpen={onboardingModal.isOpen}
+        mode={onboardingModal.mode}
+        matchingClassmates={onboardingModal.matchingClassmates}
+        currentUserEmail={firebaseUser?.email || user?.email || ''}
+        currentUserDisplayName={firebaseUser?.displayName || user?.name || ''}
+        currentClassId={currentClassId}
+        allTransactions={transactions}
+        onComplete={handleOnboardingComplete}
+        onClose={() => setOnboardingModal(prev => ({ ...prev, isOpen: false }))}
       />
     </DataProvider>
   );
