@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction, Classmate, PaymentCategory } from '../types';
 import { useData } from '../context/DataContext';
+import { db } from '../firebase';
 
 // Helper: Normalize name into lowercase alphanumeric tokens for flexible comparison (order-independent)
 export const normalizeNameTokens = (name?: string): string[] => {
@@ -66,13 +67,94 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
   const isGuest = user?.role === 'Guest';
   const isStandardClassmate = Boolean(user && !isAdmin && !isGuest && user.name);
 
-  // 1. If an initialTransactionId is provided in the URL or props, locate that specific transaction directly
+  const [directFetchedTxs, setDirectFetchedTxs] = useState<Transaction[]>([]);
+  const [isDirectLoading, setIsDirectLoading] = useState<boolean>(false);
+
+  // Active direct fetcher to guarantee transaction and statement records load from Firestore
+  useEffect(() => {
+    if (!isOpen) return;
+    const targetTx = initialTransactionId;
+    const targetName = initialClassmateName;
+
+    let isMounted = true;
+    const performDirectFetch = async () => {
+      setIsDirectLoading(true);
+      const fetched: Transaction[] = [];
+
+      try {
+        // 1. Fetch exact transaction by ID
+        if (targetTx) {
+          const docSnap = await db.collection('transactions').doc(targetTx).get();
+          if (docSnap.exists) {
+            fetched.push({ id: docSnap.id, ...docSnap.data() } as Transaction);
+          }
+        }
+
+        // 2. Fetch by classmateName if provided
+        if (targetName) {
+          const snapByName = await db.collection('transactions')
+            .where('classmateName', '==', targetName)
+            .get();
+          snapByName.docs.forEach(d => {
+            if (!fetched.some(f => f.id === d.id)) {
+              fetched.push({ id: d.id, ...d.data() } as Transaction);
+            }
+          });
+        }
+
+        // 3. If classId is provided, fetch all class transactions
+        if (currentClassId && fetched.length === 0) {
+          const snapByClass = await db.collection('transactions')
+            .where('classId', '==', currentClassId)
+            .get();
+          snapByClass.docs.forEach(d => {
+            if (!fetched.some(f => f.id === d.id)) {
+              fetched.push({ id: d.id, ...d.data() } as Transaction);
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("Direct modal transaction lookup error:", err);
+      } finally {
+        if (isMounted) {
+          if (fetched.length > 0) {
+            setDirectFetchedTxs(prev => {
+              const combined = [...prev];
+              fetched.forEach(item => {
+                if (!combined.some(c => c.id === item.id)) {
+                  combined.push(item);
+                }
+              });
+              return combined;
+            });
+          }
+          setIsDirectLoading(false);
+        }
+      }
+    };
+
+    performDirectFetch();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, initialTransactionId, initialClassmateName, currentClassId]);
+
+  // Combine all available transactions from props and direct fetches
+  const allAvailableTxs = useMemo(() => {
+    const map = new Map<string, Transaction>();
+    transactions.forEach(t => map.set(t.id, t));
+    directFetchedTxs.forEach(t => map.set(t.id, t));
+    return Array.from(map.values());
+  }, [transactions, directFetchedTxs]);
+
+  // 1. Locate direct transaction
   const directTx = useMemo(() => {
     if (initialTransactionId) {
-      return transactions.find(t => t.id === initialTransactionId);
+      return allAvailableTxs.find(t => t.id === initialTransactionId || t.transactionId === initialTransactionId);
     }
     return null;
-  }, [transactions, initialTransactionId]);
+  }, [allAvailableTxs, initialTransactionId]);
 
   // Determine initial selected classmate name
   const effectiveInitialName = useMemo(() => {
@@ -146,10 +228,10 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
     const directClassmateName = directTx?.classmateName;
     const profileName = classmateProfile?.name;
 
-    return transactions.filter(t => {
+    return allAvailableTxs.filter(t => {
       // 1. Direct ID match
-      if (initialTransactionId && t.id === initialTransactionId) return true;
-      if (selectedTxId && t.id === selectedTxId) return true;
+      if (initialTransactionId && (t.id === initialTransactionId || t.transactionId === initialTransactionId)) return true;
+      if (selectedTxId && (t.id === selectedTxId || t.transactionId === selectedTxId)) return true;
 
       // 2. Flexible name matching across target name, direct transaction name, and profile name
       if (targetName && areNamesMatching(t.classmateName, targetName)) return true;
@@ -158,19 +240,19 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
 
       return false;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, selectedClassmateName, initialClassmateName, isStandardClassmate, user?.name, directTx, classmateProfile, initialTransactionId, selectedTxId]);
+  }, [allAvailableTxs, selectedClassmateName, initialClassmateName, isStandardClassmate, user?.name, directTx, classmateProfile, initialTransactionId, selectedTxId]);
 
   // Selected Transaction for individual receipt
   const selectedTx = useMemo(() => {
     if (selectedTxId) {
-      const foundInList = classmateTxs.find(t => t.id === selectedTxId);
+      const foundInList = classmateTxs.find(t => t.id === selectedTxId || t.transactionId === selectedTxId);
       if (foundInList) return foundInList;
-      const foundInAll = transactions.find(t => t.id === selectedTxId);
+      const foundInAll = allAvailableTxs.find(t => t.id === selectedTxId || t.transactionId === selectedTxId);
       if (foundInAll) return foundInAll;
     }
     if (directTx) return directTx;
     return classmateTxs[0] || null;
-  }, [classmateTxs, selectedTxId, directTx, transactions]);
+  }, [classmateTxs, selectedTxId, directTx, allAvailableTxs]);
 
   // Financial Summary Metrics
   const summary = useMemo(() => {
@@ -479,11 +561,11 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
                 </div>
               )}
 
-              {isLoading && transactions.length === 0 ? (
+              {(isLoading || isDirectLoading) && !selectedTx ? (
                 <div className="bg-white p-12 text-center rounded-2xl border border-gray-200 shadow-sm">
                   <div className="w-8 h-8 border-3 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-                  <h4 className="text-base font-bold text-gray-800">Loading Payment Records...</h4>
-                  <p className="text-xs text-gray-500 mt-1">Retrieving verified receipts from class ledger {currentClassId}</p>
+                  <h4 className="text-base font-bold text-gray-800">Loading Payment Statement...</h4>
+                  <p className="text-xs text-gray-500 mt-1">Retrieving official payment records for {activeDisplayName}</p>
                 </div>
               ) : selectedTx ? (
                 <div id="printable-receipt" className="bg-white rounded-2xl border-2 border-gray-200 shadow-lg p-6 sm:p-8 relative overflow-hidden">

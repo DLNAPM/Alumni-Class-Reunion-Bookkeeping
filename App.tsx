@@ -194,15 +194,24 @@ const App: React.FC = () => {
       }
   };
 
-  const handleGuestLogin = () => {
+  const handleGuestLogin = async () => {
     const params = new URLSearchParams(window.location.search);
-    const urlClassId = params.get('classId')?.trim().toUpperCase();
+    const urlClassId = params.get('classId')?.trim();
     const urlClassmate = params.get('classmate')?.trim();
     const urlTxId = params.get('txId')?.trim();
 
     const targetClassId = urlClassId || 'DEMO';
+    
+    try {
+      if (!auth.currentUser) {
+        await auth.signInAnonymously();
+      }
+    } catch (e) {
+      console.warn("Guest anonymous auth notice:", e);
+    }
+
     const guestUser: User = {
-      id: 'guest',
+      id: auth.currentUser?.uid || 'guest',
       name: urlClassmate || 'Guest User',
       email: '',
       isAdmin: false,
@@ -363,8 +372,26 @@ const App: React.FC = () => {
         console.error("Error fetching transactions:", error);
         setIsLoading(false);
       });
+
+    // Also if a specific txId is present in URL or deep link, directly fetch that doc to guarantee availability
+    const params = new URLSearchParams(window.location.search);
+    const urlTxId = params.get('txId')?.trim() || receiptInitialTxId;
+    if (urlTxId) {
+      db.collection('transactions').doc(urlTxId).get().then(docSnap => {
+        if (docSnap.exists) {
+          const directDoc = { id: docSnap.id, ...docSnap.data() } as Transaction;
+          setTransactions(prev => {
+            if (!prev.some(t => t.id === directDoc.id)) {
+              return [directDoc, ...prev];
+            }
+            return prev;
+          });
+        }
+      }).catch(err => console.warn("Direct tx lookup notice:", err));
+    }
+
     return () => unsubscribe();
-  }, [currentClassId]);
+  }, [currentClassId, receiptInitialTxId]);
 
   // Fetch Classmates
   useEffect(() => {
@@ -930,7 +957,8 @@ const App: React.FC = () => {
       deleteClassmates,
       updateClassmatesStatus,
       reconcileDuplicateClassmates,
-      openReceiptDashboard
+      openReceiptDashboard,
+      isLoading
     }}>
       <div className="min-h-screen bg-brand-background flex flex-col lg:flex-row">
         <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} onLogout={handleLogout} />
