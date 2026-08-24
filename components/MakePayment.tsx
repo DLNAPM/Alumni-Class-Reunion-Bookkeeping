@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { PaymentCategory, Transaction, PaymentType } from '../types';
+import { getTodayLocalDateString } from '../services/dateUtils';
 
 const MakePayment: React.FC = () => {
   const { user, addTransaction } = useData();
@@ -17,7 +18,7 @@ const MakePayment: React.FC = () => {
     setStatus('processing');
     
     const newTransaction: Omit<Transaction, 'id' | 'classId'> = {
-      date: new Date().toISOString().split('T')[0],
+      date: getTodayLocalDateString(),
       description: description || `${category} Payment`,
       category: category,
       amount: parseFloat(amount),

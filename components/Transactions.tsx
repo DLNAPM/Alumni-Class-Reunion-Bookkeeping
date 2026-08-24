@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { useData } from '../context/DataContext';
 import { PaymentCategory, Transaction } from '../types';
+import { formatDisplayDate } from '../services/dateUtils';
 
 const Transactions: React.FC = () => {
   const { transactions, user, openReceiptDashboard } = useData();
@@ -99,7 +100,7 @@ const Transactions: React.FC = () => {
           <tbody className="bg-white divide-y divide-gray-200">
             {sortedTransactions.map((transaction) => (
               <tr key={transaction.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(transaction.date).toLocaleDateString()}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDisplayDate(transaction.date)}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{transaction.description}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{transaction.category}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate" title={transaction.transactionId}>{transaction.transactionId || ''}</td>

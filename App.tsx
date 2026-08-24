@@ -84,33 +84,59 @@ const App: React.FC = () => {
   // Auto-detect classId and classmate receipt parameters on initial load
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const urlClassId = params.get('classId')?.trim().toUpperCase();
+    const urlClassId = params.get('classId')?.trim();
     const urlClassmate = params.get('classmate')?.trim();
     const urlTxId = params.get('txId')?.trim();
 
-    if (urlClassId && !currentClassId) {
-      setCurrentClassId(urlClassId);
+    const targetClassId = urlClassId ? urlClassId.toUpperCase() : '';
+
+    if (targetClassId && !currentClassId) {
+      setCurrentClassId(targetClassId);
       setIsSelectingClass(false);
     }
 
     if (urlClassmate) {
       setReceiptClassmateName(urlClassmate);
-      setReceiptInitialTxId(urlTxId || undefined);
+    }
+    if (urlTxId) {
+      setReceiptInitialTxId(urlTxId);
+    }
+
+    // If deep-link has classmate or txId, ensure anonymous auth and open receipt modal
+    if (urlClassmate || urlTxId) {
+      if (!auth.currentUser) {
+        auth.signInAnonymously().catch(e => console.warn("Deep-link anonymous auth notice:", e));
+      }
+      if (targetClassId) {
+        setCurrentClassId(targetClassId);
+        setIsSelectingClass(false);
+      }
+      setUser(prev => {
+        if (prev && prev.role !== 'Guest') return prev;
+        return {
+          id: auth.currentUser?.uid || 'guest',
+          name: urlClassmate || 'Guest User',
+          email: '',
+          isAdmin: false,
+          role: 'Guest',
+        };
+      });
+      setReceiptModalOpen(true);
     }
   }, []);
 
-  // When transactions / classmates finish loading, automatically trigger deep-linked receipt dashboard
+  // When transactions / classmates finish loading, ensure deep-linked receipt dashboard stays open
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const urlClassmate = params.get('classmate')?.trim();
     const urlTxId = params.get('txId')?.trim();
 
-    if (urlClassmate && currentClassId && (user || firebaseUser)) {
-      setReceiptClassmateName(urlClassmate);
-      setReceiptInitialTxId(urlTxId || undefined);
+    if ((urlClassmate || urlTxId) && currentClassId) {
+      if (urlClassmate) setReceiptClassmateName(urlClassmate);
+      if (urlTxId) setReceiptInitialTxId(urlTxId);
       setReceiptModalOpen(true);
     }
-  }, [currentClassId, user, firebaseUser]);
+  }, [currentClassId]);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (u) => {
@@ -119,6 +145,28 @@ const App: React.FC = () => {
       setAuthError(null);
 
       if (u) {
+        // If user is anonymous (Guest access for direct links)
+        if (u.isAnonymous || !u.email) {
+          const params = new URLSearchParams(window.location.search);
+          const urlClassId = params.get('classId')?.trim().toUpperCase();
+          const urlClassmate = params.get('classmate')?.trim();
+          if (urlClassId) {
+            setCurrentClassId(urlClassId);
+            setIsSelectingClass(false);
+          }
+          setUser(prev => {
+            if (prev && prev.role !== 'Guest') return prev;
+            return {
+              id: u.uid,
+              name: urlClassmate || prev?.name || 'Guest User',
+              email: '',
+              isAdmin: false,
+              role: 'Guest',
+            };
+          });
+          return;
+        }
+
         // Check if explicit classId was provided in URL
         const params = new URLSearchParams(window.location.search);
         const urlClassId = params.get('classId')?.trim().toUpperCase();
@@ -157,15 +205,24 @@ const App: React.FC = () => {
 
       } else {
         // Logged out
-        setUser(null);
         const params = new URLSearchParams(window.location.search);
         const urlClassId = params.get('classId')?.trim().toUpperCase();
-        if (urlClassId) {
-          setCurrentClassId(urlClassId);
+        const urlClassmate = params.get('classmate')?.trim();
+        const urlTxId = params.get('txId')?.trim();
+
+        if (urlClassmate || urlTxId) {
+          // Keep guest user active for deep link
+          if (urlClassId) setCurrentClassId(urlClassId);
+          setIsSelectingClass(false);
         } else {
-          setCurrentClassId('');
+          setUser(null);
+          if (urlClassId) {
+            setCurrentClassId(urlClassId);
+          } else {
+            setCurrentClassId('');
+          }
+          setIsSelectingClass(false);
         }
-        setIsSelectingClass(false);
       }
     });
     return () => unsubscribe();
@@ -252,6 +309,23 @@ const App: React.FC = () => {
   // Fetch User Role/Profile
   useEffect(() => {
     if (!firebaseUser || !currentClassId) return;
+
+    // For anonymous guest logins, do not query or create a regular classmate profile
+    if (firebaseUser.isAnonymous || !firebaseUser.email) {
+      const params = new URLSearchParams(window.location.search);
+      const urlClassmate = params.get('classmate')?.trim();
+      setUser(prev => {
+        if (prev && prev.role !== 'Guest') return prev;
+        return {
+          id: firebaseUser.uid,
+          name: urlClassmate || prev?.name || 'Guest User',
+          email: '',
+          isAdmin: false,
+          role: 'Guest',
+        };
+      });
+      return;
+    }
 
     let unsubscribe: () => void;
 
@@ -359,8 +433,16 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!currentClassId) return;
     setIsLoading(true);
+
+    const classIdVariants = Array.from(new Set([
+      currentClassId,
+      currentClassId.toLowerCase(),
+      currentClassId.toUpperCase(),
+      currentClassId.trim()
+    ].filter(Boolean)));
+
     const unsubscribe = db.collection('transactions')
-      .where('classId', '==', currentClassId)
+      .where('classId', 'in', classIdVariants)
       .onSnapshot((snapshot) => {
         const loadedTransactions = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -369,8 +451,20 @@ const App: React.FC = () => {
         setTransactions(loadedTransactions);
         setIsLoading(false);
       }, (error) => {
-        console.error("Error fetching transactions:", error);
-        setIsLoading(false);
+        console.warn("Transactions in-query error, trying direct query:", error);
+        db.collection('transactions')
+          .where('classId', '==', currentClassId)
+          .onSnapshot((snapshot) => {
+            const loadedTransactions = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            } as Transaction));
+            setTransactions(loadedTransactions);
+            setIsLoading(false);
+          }, (err) => {
+            console.error("Error fetching transactions:", err);
+            setIsLoading(false);
+          });
       });
 
     // Also if a specific txId is present in URL or deep link, directly fetch that doc to guarantee availability
@@ -386,25 +480,47 @@ const App: React.FC = () => {
             }
             return prev;
           });
+          if (directDoc.classmateName && !receiptClassmateName) {
+            setReceiptClassmateName(directDoc.classmateName);
+          }
         }
       }).catch(err => console.warn("Direct tx lookup notice:", err));
     }
 
     return () => unsubscribe();
-  }, [currentClassId, receiptInitialTxId]);
+  }, [currentClassId, receiptInitialTxId, receiptClassmateName]);
 
   // Fetch Classmates
   useEffect(() => {
     if (!currentClassId) return;
+
+    const classIdVariants = Array.from(new Set([
+      currentClassId,
+      currentClassId.toLowerCase(),
+      currentClassId.toUpperCase(),
+      currentClassId.trim()
+    ].filter(Boolean)));
+
     const unsubscribe = db.collection('classmates')
-      .where('classId', '==', currentClassId)
+      .where('classId', 'in', classIdVariants)
       .onSnapshot((snapshot) => {
         const loadedClassmates = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         } as Classmate));
         setClassmates(loadedClassmates);
-      }, (error) => console.error("Error fetching classmates:", error));
+      }, (error) => {
+        db.collection('classmates')
+          .where('classId', '==', currentClassId)
+          .onSnapshot((snapshot) => {
+            const loadedClassmates = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            } as Classmate));
+            setClassmates(loadedClassmates);
+          }, (err) => console.error("Error fetching classmates:", err));
+      });
+
     return () => unsubscribe();
   }, [currentClassId]);
 

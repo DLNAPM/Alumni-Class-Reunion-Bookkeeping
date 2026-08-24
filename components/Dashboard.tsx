@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { useData } from '../context/DataContext';
 import { PaymentCategory } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { getYearFromDateString, formatDisplayDate } from '../services/dateUtils';
 
 const StatCard: React.FC<{ title: string; value: string; icon: React.ReactElement }> = ({ title, value, icon }) => (
   <div className="bg-white p-6 rounded-lg shadow-md flex items-center">
@@ -47,7 +48,7 @@ const Dashboard: React.FC = () => {
 
     transactions.forEach(t => {
       if (selectedCategories.includes(t.category)) {
-        const year = new Date(t.date).getFullYear().toString();
+        const year = getYearFromDateString(t.date);
         if (!yearlyData[year]) {
           yearlyData[year] = {};
           selectedCategories.forEach(cat => {
@@ -175,7 +176,7 @@ const Dashboard: React.FC = () => {
                       allowFullScreen={true}
                     ></iframe>
                   </div>
-                  <p className="text-xs text-gray-400 mt-2">{new Date(ann.date).toLocaleDateString()}</p>
+                  <p className="text-xs text-gray-400 mt-2">{formatDisplayDate(ann.date)}</p>
                 </div>
               );
             }
@@ -197,7 +198,7 @@ const Dashboard: React.FC = () => {
                     onClick={() => setEnlargedImageUrl(ann.imageUrl)}
                   />
                 )}
-                <p className="text-xs text-gray-400 mt-2">{new Date(ann.date).toLocaleDateString()}</p>
+                <p className="text-xs text-gray-400 mt-2">{formatDisplayDate(ann.date)}</p>
               </div>
             );
           })}

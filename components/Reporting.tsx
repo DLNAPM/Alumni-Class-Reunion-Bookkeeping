@@ -3,6 +3,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { useData } from '../context/DataContext';
 import { PaymentCategory, Transaction, PaymentType } from '../types';
+import { formatDisplayDate, getTodayLocalDateString, parseLocalDate, formatLocalDateToYYYYMMDD } from '../services/dateUtils';
 
 const Reporting: React.FC = () => {
   const { transactions } = useData();
@@ -48,12 +49,12 @@ const Reporting: React.FC = () => {
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => {
-      const transactionDate = new Date(t.date);
-      const startDate = filters.startDate ? new Date(filters.startDate) : null;
-      const endDate = filters.endDate ? new Date(filters.endDate) : null;
+      const tDate = formatLocalDateToYYYYMMDD(parseLocalDate(t.date) || new Date(t.date));
+      const startDate = filters.startDate ? filters.startDate : null;
+      const endDate = filters.endDate ? filters.endDate : null;
 
-      if (startDate && transactionDate < startDate) return false;
-      if (endDate && transactionDate > endDate) return false;
+      if (startDate && tDate < startDate) return false;
+      if (endDate && tDate > endDate) return false;
       if (filters.classmateName && !t.classmateName.toLowerCase().includes(filters.classmateName.toLowerCase())) return false;
       if (filters.description && !t.description.toLowerCase().includes(filters.description.toLowerCase())) return false;
       if (filters.categories.length > 0 && !filters.categories.includes(t.category)) return false;
@@ -63,7 +64,11 @@ const Reporting: React.FC = () => {
       if (filters.transactionId && (!t.transactionId || !t.transactionId.toLowerCase().includes(filters.transactionId.toLowerCase()))) return false;
       
       return true;
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }).sort((a, b) => {
+      const timeA = parseLocalDate(a.date)?.getTime() || 0;
+      const timeB = parseLocalDate(b.date)?.getTime() || 0;
+      return timeB - timeA;
+    });
   }, [transactions, filters]);
 
   const summary = useMemo(() => {
@@ -85,7 +90,7 @@ const Reporting: React.FC = () => {
       URL.revokeObjectURL(link.href);
     }
     link.href = URL.createObjectURL(blob);
-    link.download = `transactions_report_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `transactions_report_${getTodayLocalDateString()}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -256,7 +261,7 @@ const Reporting: React.FC = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                     {filteredTransactions.map(t => (
                         <tr key={t.id}>
-                            <td className="px-4 py-2 whitespace-nowrap">{new Date(t.date).toLocaleDateString()}</td>
+                            <td className="px-4 py-2 whitespace-nowrap">{formatDisplayDate(t.date)}</td>
                             <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900">{t.classmateName}</td>
                             <td className="px-4 py-2 whitespace-nowrap">{t.category}</td>
                             <td className="px-4 py-2 whitespace-nowrap text-xs">{t.paymentType}</td>

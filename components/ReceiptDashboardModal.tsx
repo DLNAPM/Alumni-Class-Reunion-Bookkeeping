@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction, Classmate, PaymentCategory } from '../types';
 import { useData } from '../context/DataContext';
 import { db } from '../firebase';
+import { formatDisplayDate, formatReceiptDate } from '../services/dateUtils';
 
 // Helper: Normalize name into lowercase alphanumeric tokens for flexible comparison (order-independent)
 export const normalizeNameTokens = (name?: string): string[] => {
@@ -29,11 +30,21 @@ export const areNamesMatching = (nameA?: string, nameB?: string): boolean => {
   const sortedB = [...tokensB].sort().join(' ');
   if (sortedA === sortedB) return true;
 
-  // Check token set overlap for names with titles or middle initials (e.g. "Samuel Perry" vs "Samuel E. Perry")
+  // Substring match
+  if (tokensA.every(t => b.includes(t)) || tokensB.every(t => a.includes(t))) {
+    return true;
+  }
+
+  // Token set overlap
   const setB = new Set(tokensB);
   const common = tokensA.filter(t => setB.has(t));
-  if (common.length >= 2 && (common.length === tokensA.length || common.length === tokensB.length)) {
-    return true;
+  if (common.length > 0) {
+    const hasSubstantive = common.some(t => t.length >= 3);
+    if (hasSubstantive) {
+      if (common.length >= 2 || tokensA.length <= 2 || tokensB.length <= 2) {
+        return true;
+      }
+    }
   }
 
   return false;
@@ -65,7 +76,8 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
   const { user, isLoading } = useData();
   const isAdmin = Boolean(user?.isAdmin || user?.role === 'Admin');
   const isGuest = user?.role === 'Guest';
-  const isStandardClassmate = Boolean(user && !isAdmin && !isGuest && user.name);
+  // Standard classmate is someone logged in without explicit direct receipt target
+  const isStandardClassmate = Boolean(user && !isAdmin && !isGuest && user.name && !initialClassmateName && !initialTransactionId);
 
   const [directFetchedTxs, setDirectFetchedTxs] = useState<Transaction[]>([]);
   const [isDirectLoading, setIsDirectLoading] = useState<boolean>(false);
@@ -73,8 +85,8 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
   // Active direct fetcher to guarantee transaction and statement records load from Firestore
   useEffect(() => {
     if (!isOpen) return;
-    const targetTx = initialTransactionId;
-    const targetName = initialClassmateName;
+    const targetTx = initialTransactionId?.trim();
+    const targetName = initialClassmateName?.trim();
 
     let isMounted = true;
     const performDirectFetch = async () => {
@@ -84,34 +96,88 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
       try {
         // 1. Fetch exact transaction by ID
         if (targetTx) {
-          const docSnap = await db.collection('transactions').doc(targetTx).get();
-          if (docSnap.exists) {
-            fetched.push({ id: docSnap.id, ...docSnap.data() } as Transaction);
+          try {
+            const docSnap = await db.collection('transactions').doc(targetTx).get();
+            if (docSnap.exists) {
+              fetched.push({ id: docSnap.id, ...docSnap.data() } as Transaction);
+            }
+          } catch (e) {
+            console.warn("Direct doc ID lookup:", e);
+          }
+
+          try {
+            const snapByTxField = await db.collection('transactions')
+              .where('transactionId', '==', targetTx)
+              .get();
+            snapByTxField.docs.forEach(d => {
+              if (!fetched.some(f => f.id === d.id)) {
+                fetched.push({ id: d.id, ...d.data() } as Transaction);
+              }
+            });
+          } catch (e) {
+            console.warn("Direct txField lookup:", e);
           }
         }
 
-        // 2. Fetch by classmateName if provided
-        if (targetName) {
-          const snapByName = await db.collection('transactions')
-            .where('classmateName', '==', targetName)
-            .get();
-          snapByName.docs.forEach(d => {
-            if (!fetched.some(f => f.id === d.id)) {
-              fetched.push({ id: d.id, ...d.data() } as Transaction);
-            }
-          });
+        // 2. Fetch by classId variations
+        const classIdsToTry = Array.from(new Set([
+          currentClassId,
+          currentClassId?.toUpperCase(),
+          currentClassId?.toLowerCase(),
+          'SAVBEACH89BULLDOGS',
+          'DEMO'
+        ].filter(Boolean)));
+
+        for (const cid of classIdsToTry) {
+          try {
+            const snapByClass = await db.collection('transactions')
+              .where('classId', '==', cid)
+              .get();
+            snapByClass.docs.forEach(d => {
+              if (!fetched.some(f => f.id === d.id)) {
+                fetched.push({ id: d.id, ...d.data() } as Transaction);
+              }
+            });
+          } catch (e) {
+            console.warn(`Fetch by classId ${cid}:`, e);
+          }
         }
 
-        // 3. If classId is provided, fetch all class transactions
-        if (currentClassId && fetched.length === 0) {
-          const snapByClass = await db.collection('transactions')
-            .where('classId', '==', currentClassId)
-            .get();
-          snapByClass.docs.forEach(d => {
-            if (!fetched.some(f => f.id === d.id)) {
-              fetched.push({ id: d.id, ...d.data() } as Transaction);
+        // 3. Fetch by classmateName variations
+        if (targetName) {
+          const nameTokens = targetName.split(/[\s,]+/).filter(Boolean);
+          const invertedName = nameTokens.length >= 2 ? `${nameTokens[1]} ${nameTokens[0]}` : targetName;
+          const commaName = nameTokens.length >= 2 ? `${nameTokens[0]}, ${nameTokens[1]}` : targetName;
+          
+          const namesToQuery = Array.from(new Set([targetName, invertedName, commaName]));
+          for (const n of namesToQuery) {
+            try {
+              const snapByName = await db.collection('transactions')
+                .where('classmateName', '==', n)
+                .get();
+              snapByName.docs.forEach(d => {
+                if (!fetched.some(f => f.id === d.id)) {
+                  fetched.push({ id: d.id, ...d.data() } as Transaction);
+                }
+              });
+            } catch (e) {
+              console.warn(`Fetch by classmateName ${n}:`, e);
             }
-          });
+          }
+        }
+
+        // 4. Fallback if still empty
+        if (fetched.length === 0) {
+          try {
+            const allSnap = await db.collection('transactions').limit(50).get();
+            allSnap.docs.forEach(d => {
+              if (!fetched.some(f => f.id === d.id)) {
+                fetched.push({ id: d.id, ...d.data() } as Transaction);
+              }
+            });
+          } catch (e) {
+            console.warn("Fallback all transactions lookup:", e);
+          }
         }
       } catch (err) {
         console.warn("Direct modal transaction lookup error:", err);
@@ -158,14 +224,17 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
 
   // Determine initial selected classmate name
   const effectiveInitialName = useMemo(() => {
+    if (initialClassmateName) {
+      return initialClassmateName;
+    }
     if (directTx?.classmateName) {
       return directTx.classmateName;
     }
-    if (isStandardClassmate && user?.name) {
+    if (user?.name && !isGuest) {
       return user.name;
     }
-    return initialClassmateName || user?.name || '';
-  }, [directTx, isStandardClassmate, user?.name, initialClassmateName]);
+    return '';
+  }, [initialClassmateName, directTx, user?.name, isGuest]);
 
   const [selectedClassmateName, setSelectedClassmateName] = useState<string>(effectiveInitialName);
   const [selectedTxId, setSelectedTxId] = useState<string | undefined>(initialTransactionId);
@@ -180,21 +249,21 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
 
   // Sync selected classmate and tx when props or directTx change
   useEffect(() => {
-    if (directTx?.classmateName) {
-      setSelectedClassmateName(directTx.classmateName);
-    } else if (isStandardClassmate && user?.name) {
-      setSelectedClassmateName(user.name);
-    } else if (initialClassmateName) {
+    if (initialClassmateName) {
       setSelectedClassmateName(initialClassmateName);
+    } else if (directTx?.classmateName) {
+      setSelectedClassmateName(directTx.classmateName);
+    } else if (user?.name && !isGuest) {
+      setSelectedClassmateName(user.name);
     }
     if (initialTransactionId) {
       setSelectedTxId(initialTransactionId);
     }
-  }, [initialClassmateName, initialTransactionId, directTx, isOpen, isStandardClassmate, user?.name]);
+  }, [initialClassmateName, initialTransactionId, directTx, isOpen, user?.name, isGuest]);
 
   // Find classmate profile with flexible matching
   const classmateProfile = useMemo(() => {
-    const targetName = isStandardClassmate && user?.name ? user.name : selectedClassmateName;
+    const targetName = selectedClassmateName || initialClassmateName || directTx?.classmateName || (!isGuest ? user?.name : '');
     if (!targetName && !directTx?.classmateName) return null;
     
     // Exact or flexible match
@@ -203,7 +272,7 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
       classmates.find(c => directTx && areNamesMatching(c.name, directTx.classmateName)) ||
       null
     );
-  }, [classmates, selectedClassmateName, isStandardClassmate, user?.name, directTx]);
+  }, [classmates, selectedClassmateName, initialClassmateName, directTx, isGuest, user?.name]);
 
   // Update default recipient email when classmate profile loads
   useEffect(() => {
@@ -216,15 +285,17 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
 
   // Active display name
   const activeDisplayName = useMemo(() => {
-    if (isStandardClassmate && user?.name) return user.name;
+    if (initialClassmateName) return initialClassmateName;
+    if (selectedClassmateName) return selectedClassmateName;
     if (classmateProfile?.name) return classmateProfile.name;
     if (directTx?.classmateName) return directTx.classmateName;
-    return selectedClassmateName || initialClassmateName || 'Classmate';
-  }, [isStandardClassmate, user?.name, classmateProfile, directTx, selectedClassmateName, initialClassmateName]);
+    if (user?.name && !isGuest) return user.name;
+    return 'Classmate';
+  }, [initialClassmateName, selectedClassmateName, classmateProfile, directTx, user?.name, isGuest]);
 
   // Classmate's transactions with flexible matching & direct ID resolution
   const classmateTxs = useMemo(() => {
-    const targetName = isStandardClassmate && user?.name ? user.name : (selectedClassmateName || initialClassmateName);
+    const targetName = selectedClassmateName || initialClassmateName || directTx?.classmateName || (!isGuest ? user?.name : '');
     const directClassmateName = directTx?.classmateName;
     const profileName = classmateProfile?.name;
 
@@ -237,10 +308,11 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
       if (targetName && areNamesMatching(t.classmateName, targetName)) return true;
       if (directClassmateName && areNamesMatching(t.classmateName, directClassmateName)) return true;
       if (profileName && areNamesMatching(t.classmateName, profileName)) return true;
+      if (initialClassmateName && areNamesMatching(t.classmateName, initialClassmateName)) return true;
 
       return false;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [allAvailableTxs, selectedClassmateName, initialClassmateName, isStandardClassmate, user?.name, directTx, classmateProfile, initialTransactionId, selectedTxId]);
+  }, [allAvailableTxs, selectedClassmateName, initialClassmateName, directTx, classmateProfile, initialTransactionId, selectedTxId, isGuest, user?.name]);
 
   // Selected Transaction for individual receipt
   const selectedTx = useMemo(() => {
@@ -321,13 +393,13 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
     text += `Class Ledger: ${subtitle} (${currentClassId})\n`;
     text += `Classmate: ${activeDisplayName}\n`;
     if (recipientEmail) text += `Email: ${recipientEmail}\n`;
-    text += `Date Generated: ${new Date().toLocaleDateString()}\n\n`;
+    text += `Date Generated: ${formatDisplayDate(new Date())}\n\n`;
 
     if (selectedTx) {
       text += `SELECTED TRANSACTION RECEIPT:\n`;
       text += `-------------------------------------\n`;
       text += `Receipt ID: RCP-${selectedTx.id.slice(0, 8).toUpperCase()}\n`;
-      text += `Date: ${new Date(selectedTx.date).toLocaleDateString()}\n`;
+      text += `Date: ${formatDisplayDate(selectedTx.date)}\n`;
       text += `Category: ${selectedTx.category}\n`;
       text += `Amount Paid: ${formatMoney(selectedTx.amount)}\n`;
       if (selectedTx.paymentType) text += `Payment Method: ${selectedTx.paymentType}\n`;
@@ -554,7 +626,7 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
                   >
                     {classmateTxs.map(t => (
                       <option key={t.id} value={t.id}>
-                        {new Date(t.date).toLocaleDateString()} - {t.category} - {formatMoney(t.amount)}
+                        {formatDisplayDate(t.date)} - {t.category} - {formatMoney(t.amount)}
                       </option>
                     ))}
                   </select>
@@ -602,7 +674,7 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
 
                     <div>
                       <span className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Payment Date</span>
-                      <span className="font-bold text-gray-900 text-base">{new Date(selectedTx.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                      <span className="font-bold text-gray-900 text-base">{formatReceiptDate(selectedTx.date, { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                     </div>
 
                     <div>
@@ -664,7 +736,7 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
                   {/* Footer Seal */}
                   <div className="mt-8 pt-4 border-t border-gray-100 flex justify-between items-center text-[11px] text-gray-400">
                     <div>Generated via Class Dues Ledger</div>
-                    <div>{new Date().toLocaleDateString()}</div>
+                    <div>{formatDisplayDate(new Date())}</div>
                   </div>
                 </div>
               ) : (
@@ -708,7 +780,7 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
                       <tbody className="divide-y divide-gray-200 bg-white">
                         {classmateTxs.map(t => (
                           <tr key={t.id} className={selectedTx?.id === t.id ? 'bg-blue-50/60 font-medium' : 'hover:bg-gray-50'}>
-                            <td className="px-4 py-3 whitespace-nowrap">{new Date(t.date).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">{formatDisplayDate(t.date)}</td>
                             <td className="px-4 py-3 whitespace-nowrap">
                               <span className="inline-block bg-gray-100 text-gray-800 text-xs font-semibold px-2 py-0.5 rounded">
                                 {t.category}

@@ -5,6 +5,7 @@ import { PaymentCategory, Transaction, PaymentType, IntegrationSettings, Announc
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import ClassmateInput from './ClassmateInput';
+import { getTodayLocalDateString, formatLocalDateToYYYYMMDD, parseLocalDate, formatDisplayDate } from '../services/dateUtils';
 
 type BulkEditData = {
   category?: PaymentCategory;
@@ -37,7 +38,7 @@ const Admin: React.FC = () => {
 
   // New Transaction State
   const [newTransaction, setNewTransaction] = useState<Omit<Transaction, 'id' | 'classId'>>({
-    date: new Date().toISOString().split('T')[0],
+    date: getTodayLocalDateString(),
     classmateName: '',
     amount: 0,
     description: '',
@@ -74,8 +75,8 @@ const Admin: React.FC = () => {
   const [targetTransactionForDuplicate, setTargetTransactionForDuplicate] = useState<Transaction | null>(null);
   const [duplicateSchedule, setDuplicateSchedule] = useState({
     frequency: 'Monthly' as 'Weekly' | 'Bi-weekly' | 'Monthly' | 'Quarterly' | 'Annually',
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    startDate: getTodayLocalDateString(),
+    endDate: formatLocalDateToYYYYMMDD(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)),
     appendSequenceNote: true,
   });
 
@@ -84,15 +85,15 @@ const Admin: React.FC = () => {
 
   const openDuplicateModal = (t: Transaction) => {
     setTargetTransactionForDuplicate(t);
-    const start = t.date || new Date().toISOString().split('T')[0];
-    const startDateObj = new Date(start + 'T00:00:00');
+    const start = t.date || getTodayLocalDateString();
+    const startDateObj = parseLocalDate(start) || new Date();
     const endDateObj = new Date(startDateObj);
     endDateObj.setMonth(endDateObj.getMonth() + 3);
 
     setDuplicateSchedule({
       frequency: 'Monthly',
       startDate: start,
-      endDate: endDateObj.toISOString().split('T')[0],
+      endDate: formatLocalDateToYYYYMMDD(endDateObj),
       appendSequenceNote: true,
     });
     setDuplicateModalOpen(true);
@@ -100,14 +101,14 @@ const Admin: React.FC = () => {
 
   const openBulkDuplicateModal = () => {
     setTargetTransactionForDuplicate(null);
-    const start = new Date().toISOString().split('T')[0];
+    const start = getTodayLocalDateString();
     const endDateObj = new Date();
     endDateObj.setMonth(endDateObj.getMonth() + 3);
 
     setDuplicateSchedule({
       frequency: 'Monthly',
       startDate: start,
-      endDate: endDateObj.toISOString().split('T')[0],
+      endDate: formatLocalDateToYYYYMMDD(endDateObj),
       appendSequenceNote: true,
     });
     setDuplicateModalOpen(true);
@@ -116,9 +117,9 @@ const Admin: React.FC = () => {
   const calculatedDuplicateDates = useMemo(() => {
     const { startDate, endDate, frequency } = duplicateSchedule;
     if (!startDate || !endDate) return [];
-    const start = new Date(startDate + 'T00:00:00');
-    const end = new Date(endDate + 'T00:00:00');
-    if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return [];
+    const start = parseLocalDate(startDate);
+    const end = parseLocalDate(endDate);
+    if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return [];
 
     const dates: string[] = [];
     let step = 0;
@@ -138,7 +139,7 @@ const Admin: React.FC = () => {
       }
 
       if (nextDate > end) break;
-      dates.push(nextDate.toISOString().split('T')[0]);
+      dates.push(formatLocalDateToYYYYMMDD(nextDate));
       step++;
     }
     return dates;
@@ -274,7 +275,7 @@ const Admin: React.FC = () => {
   };
 
   const calculateNextDate = (startDate: string, frequency: RecurringFrequency, index: number): string => {
-    const d = new Date(startDate + 'T00:00:00');
+    const d = parseLocalDate(startDate) || new Date();
     switch (frequency) {
       case 'Weekly': d.setDate(d.getDate() + 7 * index); break;
       case 'Bi-weekly': d.setDate(d.getDate() + 14 * index); break;
@@ -282,7 +283,7 @@ const Admin: React.FC = () => {
       case 'Quarterly': d.setMonth(d.getMonth() + 3 * index); break;
       case 'Annually': d.setFullYear(d.getFullYear() + index); break;
     }
-    return d.toISOString().split('T')[0];
+    return formatLocalDateToYYYYMMDD(d);
   };
 
   const handleAddNewTransaction = async (e: React.FormEvent) => {
@@ -306,7 +307,7 @@ const Admin: React.FC = () => {
 
       // Reset
       setNewTransaction({
-        date: new Date().toISOString().split('T')[0],
+        date: getTodayLocalDateString(),
         classmateName: '',
         amount: 0,
         description: '',
@@ -404,21 +405,21 @@ const Admin: React.FC = () => {
   const parseDate = (dateValue: any): string | null => {
     if (!dateValue) return null;
     if (typeof dateValue === 'number') {
-        const excelEpoch = new Date(1899, 11, 30);
-        const date = new Date(excelEpoch.getTime() + dateValue * 86400000);
-        return date.toISOString().split('T')[0];
+      const excelEpoch = new Date(1899, 11, 30);
+      const date = new Date(excelEpoch.getTime() + dateValue * 86400000);
+      return formatLocalDateToYYYYMMDD(date);
     }
-    const date = new Date(dateValue);
-    if (!isNaN(date.getTime())) {
-      return date.toISOString().split('T')[0];
+    const parsed = parseLocalDate(dateValue);
+    if (parsed) {
+      return formatLocalDateToYYYYMMDD(parsed);
     }
     const parts = String(dateValue).match(/(\d{1,2})-(\w{3})-(\d{2,4})/);
     if (parts) {
-      const year = parseInt(parts[3]);
+      const year = parseInt(parts[3], 10);
       const fullYear = year < 50 ? 2000 + year : 1900 + year;
       const parsedDate = new Date(`${parts[1]} ${parts[2]} ${fullYear}`);
       if (!isNaN(parsedDate.getTime())) {
-        return parsedDate.toISOString().split('T')[0];
+        return formatLocalDateToYYYYMMDD(parsedDate);
       }
     }
     return null;
@@ -798,7 +799,7 @@ const Admin: React.FC = () => {
                           />
                       </td>
                       )}
-                      <td className="px-4 py-2 whitespace-nowrap">{new Date(t.date).toLocaleDateString()}</td>
+                      <td className="px-4 py-2 whitespace-nowrap">{formatDisplayDate(t.date)}</td>
                       <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900">{t.classmateName}</td>
                       <td className="px-4 py-2 whitespace-nowrap text-gray-600 truncate max-w-xs" title={t.description}>{t.description}</td>
                       <td className="px-4 py-2 whitespace-nowrap">{t.category}</td>
@@ -1123,7 +1124,7 @@ const Admin: React.FC = () => {
                               {group.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map(t => (
                                 <tr key={t.id} className={`${transactionsToDelete.has(t.id) ? 'bg-red-50/30' : ''} transition-colors`}>
                                   <td className="p-3"><input type="checkbox" checked={transactionsToDelete.has(t.id)} onChange={() => toggleTransactionToDelete(t.id)} className="h-4 w-4 rounded text-danger focus:ring-danger"/></td>
-                                  <td className="p-3 whitespace-nowrap">{new Date(t.date).toLocaleDateString()}</td>
+                                  <td className="p-3 whitespace-nowrap">{formatDisplayDate(t.date)}</td>
                                   <td className="p-3 font-medium text-gray-900">{t.classmateName}</td>
                                   <td className="p-3 text-gray-500 truncate max-w-xs" title={t.description}>{t.description}</td>
                                 </tr>
