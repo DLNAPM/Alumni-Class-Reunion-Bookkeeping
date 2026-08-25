@@ -18,7 +18,15 @@ import ClassmateOnboardingModal from './components/ClassmateOnboardingModal';
 import { auth, db, storage, FirebaseUser, Timestamp } from './firebase';
 import type { User, Transaction, Announcement, IntegrationSettings, IntegrationService, Classmate, UserRole } from './types';
 import { formatToLastFirst, isNameMatch, deriveNameFromEmail } from './services/nameUtils';
-import { parseFacebookUrl } from './services/facebookService';
+import { 
+  parseFacebookUrl, 
+  loginAdminWithFacebook, 
+  fetchFacebookPostsFromGraph, 
+  getStoredFacebookToken, 
+  setStoredFacebookToken, 
+  clearStoredFacebookToken,
+  getStoredFacebookUserName 
+} from './services/facebookService';
 import firebase from 'firebase/compat/app';
 
 // Hardcoded Super Admin Email
@@ -883,28 +891,60 @@ const App: React.FC = () => {
       }
   };
 
-  const syncFacebookPosts = async (customUrl?: string): Promise<number> => {
+  // Facebook Admin OAuth State
+  const [fbAdminToken, setFbAdminToken] = useState<string | null>(() => getStoredFacebookToken());
+  const [fbAdminName, setFbAdminName] = useState<string | null>(() => getStoredFacebookUserName());
+  const isFbAdminLoggedIn = useMemo(() => !!fbAdminToken, [fbAdminToken]);
+
+  const disconnectFacebook = useCallback(() => {
+    clearStoredFacebookToken();
+    setFbAdminToken(null);
+    setFbAdminName(null);
+  }, []);
+
+  const syncFacebookPosts = async (customUrl?: string, customToken?: string): Promise<number> => {
     if (!currentClassId) return 0;
     const targetUrl = (customUrl || facebookPageUrl || '').trim();
-    if (!targetUrl) return 0;
+    if (!targetUrl) {
+      throw new Error("Please enter a Class Facebook Group or Page URL first.");
+    }
+    
+    const tokenToUse = customToken || fbAdminToken || getStoredFacebookToken();
+    if (!tokenToUse) {
+      throw new Error("Admin Facebook login is required to fetch posts. Please log in with Facebook.");
+    }
+
     try {
-      // Purge any legacy mock/fake announcements from database
+      const graphAnnouncements = await fetchFacebookPostsFromGraph(targetUrl, tokenToUse, currentClassId);
+      
+      // Replace existing announcements for this class in Firestore
       const existingSnap = await db.collection('announcements')
         .where('classId', '==', currentClassId)
         .get();
 
+      const batch = db.batch();
       if (!existingSnap.empty) {
-        const batch = db.batch();
-        existingSnap.docs.forEach(doc => {
-          batch.delete(doc.ref);
-        });
-        await batch.commit();
+        existingSnap.docs.forEach(doc => batch.delete(doc.ref));
       }
-      return 1;
-    } catch (error) {
+
+      for (const ann of graphAnnouncements) {
+        const newRef = db.collection('announcements').doc();
+        batch.set(newRef, ann);
+      }
+
+      await batch.commit();
+      return graphAnnouncements.length;
+    } catch (error: any) {
       console.error("Error syncing Facebook posts:", error);
       throw error;
     }
+  };
+
+  const loginWithFacebookAndSync = async (customUrl?: string): Promise<number> => {
+    const authResult = await loginAdminWithFacebook();
+    setFbAdminToken(authResult.accessToken);
+    setFbAdminName(authResult.userName || 'Facebook Admin');
+    return await syncFacebookPosts(customUrl, authResult.accessToken);
   };
 
   const setFacebookPageUrl = async (url: string) => {
@@ -914,9 +954,6 @@ const App: React.FC = () => {
       const ref = db.collection('settings').doc(currentClassId);
       await ref.set({ facebookPageUrl: trimmed }, { merge: true });
       setFacebookPageUrlState(trimmed);
-
-      // Clean up any fake mock posts
-      await syncFacebookPosts(trimmed);
     } catch (error) {
       console.error("Error setting Facebook Page URL:", error);
       alert("Failed to save Facebook Page URL.");
@@ -1286,6 +1323,10 @@ const App: React.FC = () => {
       facebookPageUrl,
       setFacebookPageUrl,
       syncFacebookPosts,
+      loginWithFacebookAndSync,
+      isFbAdminLoggedIn,
+      fbAdminName,
+      disconnectFacebook,
       transactions,
       addTransaction,
       updateTransaction,

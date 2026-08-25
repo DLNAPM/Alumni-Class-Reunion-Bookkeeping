@@ -36,6 +36,10 @@ const Dashboard: React.FC = () => {
     announcements, 
     facebookPageUrl,
     setFacebookPageUrl,
+    syncFacebookPosts,
+    loginWithFacebookAndSync,
+    isFbAdminLoggedIn,
+    fbAdminName,
     subtitle
   } = useData();
 
@@ -50,6 +54,17 @@ const Dashboard: React.FC = () => {
   const [fbUrlInput, setFbUrlInput] = useState(facebookPageUrl || '');
   const [isSavingUrl, setIsSavingUrl] = useState(false);
 
+  // Facebook Sync State on Dashboard
+  const [isSyncingFb, setIsSyncingFb] = useState(false);
+  const [fbSyncMessage, setFbSyncMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Filter the 10 most recent Facebook announcements
+  const recentFbPosts = useMemo(() => {
+    return (announcements || [])
+      .filter(a => a.type === 'facebook' || (a.url && a.url.includes('facebook.com')) || (!a.type && a.content))
+      .slice(0, 10);
+  }, [announcements]);
+
   // Keep input in sync with loaded data
   useEffect(() => {
     setFbUrlInput(facebookPageUrl || '');
@@ -59,6 +74,48 @@ const Dashboard: React.FC = () => {
   const fbInfo = useMemo(() => {
     return parseFacebookUrl(facebookPageUrl || '');
   }, [facebookPageUrl]);
+
+  const handleAdminFbLoginAndSync = async () => {
+    try {
+      setIsSyncingFb(true);
+      setFbSyncMessage(null);
+      const count = await loginWithFacebookAndSync(facebookPageUrl);
+      setFbSyncMessage({
+        type: 'success',
+        text: `Successfully authenticated with Facebook and fetched ${count} latest posts!`
+      });
+      setTimeout(() => setFbSyncMessage(null), 5000);
+    } catch (err: any) {
+      console.error("Dashboard FB Login & Sync Error:", err);
+      setFbSyncMessage({
+        type: 'error',
+        text: err.message || 'Failed to authenticate with Facebook or fetch posts.'
+      });
+    } finally {
+      setIsSyncingFb(false);
+    }
+  };
+
+  const handleAdminRefreshSync = async () => {
+    try {
+      setIsSyncingFb(true);
+      setFbSyncMessage(null);
+      const count = await syncFacebookPosts(facebookPageUrl);
+      setFbSyncMessage({
+        type: 'success',
+        text: `Feed updated! Fetched ${count} most recent posts from Facebook.`
+      });
+      setTimeout(() => setFbSyncMessage(null), 5000);
+    } catch (err: any) {
+      console.error("Dashboard FB Sync Error:", err);
+      setFbSyncMessage({
+        type: 'error',
+        text: err.message || 'Failed to refresh posts from Facebook.'
+      });
+    } finally {
+      setIsSyncingFb(false);
+    }
+  };
 
   const handleCategoryChange = (category: PaymentCategory) => {
     setSelectedCategories(prev =>
@@ -325,123 +382,247 @@ const Dashboard: React.FC = () => {
           {/* Connected Facebook Group Live Portal */}
           {facebookPageUrl && (
             <div className="space-y-6">
-              {fbInfo.isGroup ? (
-                /* Interactive Facebook Group Portal */
-                <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200 space-y-6">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200 pb-4">
-                    <div>
-                      <h4 className="font-bold text-base text-gray-900 flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-[#1877F2]"></span>
-                        Official Class Facebook Group Feed
-                      </h4>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Group ID: <strong className="text-gray-800">{fbInfo.groupIdOrName}</strong> • Live discussions, photo albums, events & classmate posts
-                      </p>
-                    </div>
-                    <a
-                      href={facebookPageUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-[#1877F2] hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow inline-flex items-center gap-1.5 self-start md:self-auto"
-                    >
-                      <span>View 10 Recent Posts on Facebook</span>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                    </a>
-                  </div>
-
-                  {/* 1-Click Launchers into the 10 most recent sections of the group */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <a 
-                      href={facebookPageUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="p-4 bg-white rounded-xl border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group block"
-                    >
-                      <div className="text-2xl mb-1.5">💬</div>
-                      <h5 className="font-bold text-sm text-gray-900 group-hover:text-blue-600 flex items-center justify-between">
-                        <span>Latest 10 Posts & Wall</span>
-                        <span className="text-gray-400 group-hover:text-blue-600 text-xs">↗</span>
-                      </h5>
-                      <p className="text-xs text-gray-500 mt-1">Browse the latest 10 posts, discussions, and classmate threads live on Facebook</p>
-                    </a>
-
-                    <a 
-                      href={`${facebookPageUrl}/photos`} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="p-4 bg-white rounded-xl border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group block"
-                    >
-                      <div className="text-2xl mb-1.5">📸</div>
-                      <h5 className="font-bold text-sm text-gray-900 group-hover:text-blue-600 flex items-center justify-between">
-                        <span>Group Photo Albums</span>
-                        <span className="text-gray-400 group-hover:text-blue-600 text-xs">↗</span>
-                      </h5>
-                      <p className="text-xs text-gray-500 mt-1">View authentic photos, senior memories, reunion snapshots and picnic galleries</p>
-                    </a>
-
-                    <a 
-                      href={`${facebookPageUrl}/events`} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="p-4 bg-white rounded-xl border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group block"
-                    >
-                      <div className="text-2xl mb-1.5">📅</div>
-                      <h5 className="font-bold text-sm text-gray-900 group-hover:text-blue-600 flex items-center justify-between">
-                        <span>Class Events & Reunions</span>
-                        <span className="text-gray-400 group-hover:text-blue-600 text-xs">↗</span>
-                      </h5>
-                      <p className="text-xs text-gray-500 mt-1">RSVP for upcoming banquets, homecoming tailgates, fundraisers and meetups</p>
-                    </a>
-
-                    <a 
-                      href={`${facebookPageUrl}/members`} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="p-4 bg-white rounded-xl border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group block"
-                    >
-                      <div className="text-2xl mb-1.5">👥</div>
-                      <h5 className="font-bold text-sm text-gray-900 group-hover:text-blue-600 flex items-center justify-between">
-                        <span>Group Members</span>
-                        <span className="text-gray-400 group-hover:text-blue-600 text-xs">↗</span>
-                      </h5>
-                      <p className="text-xs text-gray-500 mt-1">Connect with verified classmates, alumni committee members, and organizers</p>
-                    </a>
+              {/* Admin Facebook Auth & Sync Control Bar */}
+              <div className="bg-white p-4 rounded-2xl border border-blue-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className={`w-3.5 h-3.5 rounded-full ${isFbAdminLoggedIn ? 'bg-emerald-500' : 'bg-amber-400'} animate-pulse`}></div>
+                  <div>
+                    <h4 className="font-bold text-sm text-gray-900 flex items-center gap-2">
+                      <span>{isFbAdminLoggedIn ? `Connected to Facebook (${fbAdminName || 'Admin'})` : 'Admin Facebook Authentication Required'}</span>
+                    </h4>
+                    <p className="text-xs text-gray-500">
+                      {isFbAdminLoggedIn 
+                        ? 'Admin is authenticated to fetch the 10 most recent posts from the Facebook feed.' 
+                        : 'Admin must log into Facebook to authorize and fetch the 10 most recent posts.'}
+                    </p>
                   </div>
                 </div>
-              ) : (
-                /* Facebook Page Plugin Iframe (for standard Facebook Pages) */
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-sm text-gray-800 flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#1877F2]"></span>
-                      Official Facebook Page Timeline Plugin (Live)
-                    </h4>
-                    <a
-                      href={facebookPageUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-[#1877F2] hover:underline font-semibold"
-                    >
-                      Open in Facebook &rarr;
-                    </a>
-                  </div>
 
-                  <div className="w-full flex justify-center bg-gray-50 p-4 rounded-2xl border border-gray-200 overflow-hidden min-h-[500px]">
-                    <iframe
-                      title="Facebook Page Live Timeline"
-                      src={`https://www.facebook.com/plugins/page.php?href=${encodeURIComponent(facebookPageUrl)}&tabs=timeline&width=500&height=750&small_header=false&adapt_container_width=true&hide_cover=false&show_facepile=true`}
-                      width="500"
-                      height="750"
-                      style={{ border: 'none', overflow: 'hidden', maxWidth: '100%' }}
-                      scrolling="no"
-                      frameBorder="0"
-                      allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-                      allowFullScreen={true}
-                      className="rounded-xl shadow-sm bg-white"
-                    ></iframe>
+                {isAdmin && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {isFbAdminLoggedIn ? (
+                      <button
+                        type="button"
+                        onClick={handleAdminRefreshSync}
+                        disabled={isSyncingFb}
+                        className="bg-[#1877F2] hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow inline-flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        <svg className={`w-3.5 h-3.5 ${isSyncingFb ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        <span>{isSyncingFb ? 'Fetching Posts...' : 'Refresh 10 Latest Posts'}</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleAdminFbLoginAndSync}
+                        disabled={isSyncingFb}
+                        className="bg-[#1877F2] hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow inline-flex items-center gap-2 disabled:opacity-50"
+                      >
+                        <div className="w-4 h-4 rounded bg-white text-[#1877F2] font-black text-[10px] flex items-center justify-center">f</div>
+                        <span>{isSyncingFb ? 'Authenticating & Fetching...' : 'Log in with FB to Fetch 10 Posts'}</span>
+                      </button>
+                    )}
                   </div>
+                )}
+              </div>
+
+              {fbSyncMessage && (
+                <div className={`p-3.5 rounded-xl text-xs font-medium ${
+                  fbSyncMessage.type === 'success' 
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                    : 'bg-red-50 text-red-800 border border-red-200'
+                }`}>
+                  {fbSyncMessage.type === 'success' ? '✓ ' : '⚠️ '}
+                  {fbSyncMessage.text}
                 </div>
               )}
+
+              {/* 10 Most Recent Posts Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-base text-gray-900 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#1877F2]"></span>
+                    10 Most Recent Facebook Posts
+                  </h4>
+                  <span className="text-xs text-gray-500 font-medium">
+                    Showing {recentFbPosts.length} of 10 latest posts
+                  </span>
+                </div>
+
+                {recentFbPosts.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {recentFbPosts.map((post, index) => (
+                      <div 
+                        key={post.id || index}
+                        className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                      >
+                        <div className="space-y-3">
+                          {/* Post Header */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full bg-blue-100 text-[#1877F2] flex items-center justify-center font-bold text-xs shrink-0">
+                                {post.authorName ? post.authorName.charAt(0).toUpperCase() : 'FB'}
+                              </div>
+                              <div>
+                                <p className="font-bold text-xs text-gray-900 leading-tight">
+                                  {post.authorName || (fbInfo.isGroup ? 'Class Facebook Member' : 'Class Facebook Page')}
+                                </p>
+                                <p className="text-[11px] text-gray-400">
+                                  {post.date ? formatDisplayDate(post.date) : 'Recent'}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="bg-blue-50 text-[#1877F2] border border-blue-100 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
+                              Post #{index + 1}
+                            </span>
+                          </div>
+
+                          {/* Post Text */}
+                          <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-line break-words">
+                            {post.content || post.title}
+                          </p>
+
+                          {/* Attached Photo */}
+                          {post.imageUrl && (
+                            <div className="rounded-xl overflow-hidden border border-gray-100 bg-gray-50 max-h-64 flex items-center justify-center cursor-pointer group relative" onClick={() => setEnlargedImageUrl(post.imageUrl || null)}>
+                              <img 
+                                src={post.imageUrl} 
+                                alt="Facebook Post Media" 
+                                className="w-full h-full object-cover max-h-64 transition-transform group-hover:scale-102 duration-200"
+                              />
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                <span className="opacity-0 group-hover:opacity-100 bg-white/90 text-gray-900 text-[11px] font-bold px-2.5 py-1 rounded-full shadow transition-opacity">
+                                  🔍 Click to Enlarge
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Post Footer Actions */}
+                        <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
+                          <span className="text-[11px] text-gray-400 font-medium flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                            Read-Only Feed
+                          </span>
+                          <a
+                            href={post.url || facebookPageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#1877F2] hover:text-blue-800 font-bold inline-flex items-center gap-1 hover:underline text-xs"
+                          >
+                            <span>View on Facebook</span>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 rounded-2xl border border-gray-200 p-8 text-center space-y-4">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-100 text-[#1877F2] mx-auto flex items-center justify-center font-bold text-xl">
+                      f
+                    </div>
+                    <div className="max-w-md mx-auto space-y-1.5">
+                      <h5 className="font-bold text-sm text-gray-900">Admin Facebook Login Required to Fetch Posts</h5>
+                      <p className="text-xs text-gray-500 leading-relaxed">
+                        To display the 10 most recent posts from your Class Facebook Page/Group, the Admin must log into Facebook to authorize the post sync.
+                      </p>
+                    </div>
+                    {isAdmin ? (
+                      <button
+                        type="button"
+                        onClick={handleAdminFbLoginAndSync}
+                        disabled={isSyncingFb}
+                        className="bg-[#1877F2] hover:bg-blue-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-all shadow inline-flex items-center gap-2 disabled:opacity-50"
+                      >
+                        <div className="w-4 h-4 rounded bg-white text-[#1877F2] font-black text-[10px] flex items-center justify-center">f</div>
+                        <span>{isSyncingFb ? 'Authenticating & Fetching...' : 'Log in with Facebook to Fetch 10 Posts'}</span>
+                      </button>
+                    ) : (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-2.5 max-w-sm mx-auto">
+                        Class Facebook posts will be visible once an Admin logs in and synchronizes the latest posts.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* 1-Click Launchers into key sections of the Facebook Group / Page */}
+              <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200 space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-gray-200 pb-3">
+                  <h4 className="font-bold text-sm text-gray-900 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#1877F2]"></span>
+                    Class Facebook Group Launchers
+                  </h4>
+                  <a
+                    href={facebookPageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-[#1877F2] hover:underline font-bold inline-flex items-center gap-1"
+                  >
+                    <span>Open Main Page on Facebook</span>
+                    <span>↗</span>
+                  </a>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <a 
+                    href={facebookPageUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="p-4 bg-white rounded-xl border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group block"
+                  >
+                    <div className="text-2xl mb-1.5">💬</div>
+                    <h5 className="font-bold text-sm text-gray-900 group-hover:text-blue-600 flex items-center justify-between">
+                      <span>Latest Posts & Wall</span>
+                      <span className="text-gray-400 group-hover:text-blue-600 text-xs">↗</span>
+                    </h5>
+                    <p className="text-xs text-gray-500 mt-1">Browse all posts, discussions, and classmate threads live on Facebook</p>
+                  </a>
+
+                  <a 
+                    href={`${facebookPageUrl}/photos`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="p-4 bg-white rounded-xl border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group block"
+                  >
+                    <div className="text-2xl mb-1.5">📸</div>
+                    <h5 className="font-bold text-sm text-gray-900 group-hover:text-blue-600 flex items-center justify-between">
+                      <span>Group Photo Albums</span>
+                      <span className="text-gray-400 group-hover:text-blue-600 text-xs">↗</span>
+                    </h5>
+                    <p className="text-xs text-gray-500 mt-1">View authentic photos, senior memories, reunion snapshots and picnic galleries</p>
+                  </a>
+
+                  <a 
+                    href={`${facebookPageUrl}/events`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="p-4 bg-white rounded-xl border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group block"
+                  >
+                    <div className="text-2xl mb-1.5">📅</div>
+                    <h5 className="font-bold text-sm text-gray-900 group-hover:text-blue-600 flex items-center justify-between">
+                      <span>Class Events & Reunions</span>
+                      <span className="text-gray-400 group-hover:text-blue-600 text-xs">↗</span>
+                    </h5>
+                    <p className="text-xs text-gray-500 mt-1">RSVP for upcoming banquets, homecoming tailgates, fundraisers and meetups</p>
+                  </a>
+
+                  <a 
+                    href={`${facebookPageUrl}/members`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="p-4 bg-white rounded-xl border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group block"
+                  >
+                    <div className="text-2xl mb-1.5">👥</div>
+                    <h5 className="font-bold text-sm text-gray-900 group-hover:text-blue-600 flex items-center justify-between">
+                      <span>Group Members</span>
+                      <span className="text-gray-400 group-hover:text-blue-600 text-xs">↗</span>
+                    </h5>
+                    <p className="text-xs text-gray-500 mt-1">Connect with verified classmates, alumni committee members, and organizers</p>
+                  </a>
+                </div>
+              </div>
             </div>
           )}
         </div>

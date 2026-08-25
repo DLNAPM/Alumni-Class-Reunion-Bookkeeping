@@ -97,7 +97,11 @@ export interface DataContextType {
   setSubtitle: (subtitleUpdater: string | ((prevSubtitle: string) => string)) => Promise<void>;
   facebookPageUrl: string;
   setFacebookPageUrl: (url: string) => Promise<void>;
-  syncFacebookPosts: (customUrl?: string) => Promise<number>;
+  syncFacebookPosts: (customUrl?: string, customToken?: string) => Promise<number>;
+  loginWithFacebookAndSync: (customUrl?: string) => Promise<number>;
+  isFbAdminLoggedIn: boolean;
+  fbAdminName: string | null;
+  disconnectFacebook: () => void;
   transactions: Transaction[];
   addTransaction: (transaction: Omit<Transaction, 'id' | 'classId'>) => Promise<void>;
   updateTransaction: (updatedTransaction: Transaction) => Promise<void>;

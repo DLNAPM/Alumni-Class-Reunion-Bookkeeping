@@ -36,6 +36,16 @@ const googleProvider = new firebase.auth.GoogleAuthProvider();
 googleProvider.setCustomParameters({
   prompt: 'select_account'
 });
+
+const facebookProvider = new firebase.auth.FacebookAuthProvider();
+facebookProvider.addScope('public_profile');
+facebookProvider.addScope('pages_read_engagement');
+facebookProvider.addScope('pages_show_list');
+facebookProvider.addScope('groups_access_member_info');
+facebookProvider.setCustomParameters({
+  display: 'popup'
+});
+
 const Timestamp = firebase.firestore.Timestamp;
 
 // Export everything needed by the app
@@ -44,6 +54,7 @@ export {
   db,
   storage,
   googleProvider,
+  facebookProvider,
   Timestamp,
 };
 
