@@ -1,6 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { useData } from '../context/DataContext';
+import { parseLocalDate, formatDisplayDate } from '../services/dateUtils';
 
 interface HeaderProps {
   onHelpClick: () => void;
@@ -9,12 +10,28 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ onHelpClick }) => {
   const { user, subtitle, transactions } = useData();
 
-  const lastTransactionDate = useMemo(() => {
-    if (!transactions || transactions.length === 0) return null;
-    const dates = transactions.map(t => new Date(t.date).getTime());
-    const maxDate = Math.max(...dates);
-    if (isNaN(maxDate)) return null;
-    return new Date(maxDate).toLocaleDateString();
+  const { firstTransactionDate, lastTransactionDate } = useMemo(() => {
+    if (!transactions || transactions.length === 0) {
+      return { firstTransactionDate: null, lastTransactionDate: null };
+    }
+    const validTimestamps = transactions
+      .map(t => {
+        const parsed = parseLocalDate(t.date);
+        return parsed ? parsed.getTime() : new Date(t.date).getTime();
+      })
+      .filter(ts => !isNaN(ts));
+
+    if (validTimestamps.length === 0) {
+      return { firstTransactionDate: null, lastTransactionDate: null };
+    }
+
+    const minTs = Math.min(...validTimestamps);
+    const maxTs = Math.max(...validTimestamps);
+
+    return {
+      firstTransactionDate: formatDisplayDate(minTs),
+      lastTransactionDate: formatDisplayDate(maxTs)
+    };
   }, [transactions]);
 
   return (
@@ -40,8 +57,13 @@ const Header: React.FC<HeaderProps> = ({ onHelpClick }) => {
                   {user?.name?.charAt(0) || 'U'}
                 </div>
             </div>
-            {lastTransactionDate && (
+            {firstTransactionDate && (
                  <span className="text-[10px] text-gray-400 mt-1 mr-1 uppercase tracking-wider font-semibold">
+                    First Recorded Transaction Date: {firstTransactionDate}
+                 </span>
+            )}
+            {lastTransactionDate && (
+                 <span className="text-[10px] text-gray-400 mt-0.5 mr-1 uppercase tracking-wider font-semibold">
                     Last Transaction Date: {lastTransactionDate}
                  </span>
             )}
