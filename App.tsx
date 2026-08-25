@@ -681,30 +681,32 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [currentClassId]);
 
-  // Fetch Announcements
+  // Purge any legacy mock announcements and maintain clean state
   useEffect(() => {
     if (!currentClassId) return;
+    
+    // Purge legacy mock announcements for this class from Firestore
+    db.collection('announcements')
+      .where('classId', '==', currentClassId)
+      .get()
+      .then(snap => {
+        if (!snap.empty) {
+          const batch = db.batch();
+          snap.docs.forEach(doc => batch.delete(doc.ref));
+          batch.commit().catch(err => console.warn("Error purging legacy announcements:", err));
+        }
+      })
+      .catch(err => console.warn("Error checking announcements:", err));
+
     const unsubscribe = db.collection('announcements')
       .where('classId', '==', currentClassId)
       .onSnapshot((snapshot) => {
-      const loadedAnnouncements = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Announcement));
-      loadedAnnouncements.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
-      // Deduplicate to ensure no duplicate titles appear
-      const seen = new Set<string>();
-      const uniqueAnnouncements: Announcement[] = [];
-      for (const item of loadedAnnouncements) {
-        const key = (item.title || '').trim().toLowerCase();
-        if (!seen.has(key)) {
-          seen.add(key);
-          uniqueAnnouncements.push(item);
-        }
-      }
-      setAnnouncements(uniqueAnnouncements);
-    });
+        const loadedAnnouncements = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as Announcement));
+        setAnnouncements(loadedAnnouncements);
+      });
     return () => unsubscribe();
   }, [currentClassId]);
 

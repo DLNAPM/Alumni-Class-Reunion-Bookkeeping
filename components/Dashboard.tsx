@@ -444,30 +444,6 @@ const Dashboard: React.FC = () => {
               )}
             </div>
           )}
-
-          {/* Custom Committee Bulletins (if any real non-mock announcements exist) */}
-          {announcements.length > 0 && (
-            <div className="space-y-4 pt-4 border-t border-gray-100">
-              <h4 className="font-bold text-sm text-gray-900">
-                Official Committee Bulletins ({announcements.length})
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {announcements.slice(0, 10).map((ann, idx) => (
-                  <div key={ann.id || `ann-${idx}`} className="bg-white border border-gray-200 rounded-xl p-4 space-y-2">
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span className="font-semibold text-gray-900">{ann.authorName || 'Committee'}</span>
-                      <span>{formatDisplayDate(ann.date)}</span>
-                    </div>
-                    <h5 className="font-bold text-sm text-gray-900">{ann.title}</h5>
-                    {ann.content && <p className="text-xs text-gray-600 whitespace-pre-line">{ann.content}</p>}
-                    {ann.imageUrl && (
-                      <img src={ann.imageUrl} alt={ann.title} className="w-full max-h-48 object-cover rounded-lg mt-2" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -484,7 +460,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-base text-gray-900">Configure Class Facebook Group URL</h3>
-                  <p className="text-xs text-gray-500">Supports Facebook Groups (with 100+ posts) and Pages</p>
+                  <p className="text-xs text-gray-500">Links your official Class Facebook Group or Page</p>
                 </div>
               </div>
               <button 
@@ -516,10 +492,10 @@ const Dashboard: React.FC = () => {
               <div className="bg-blue-50 p-3.5 rounded-xl border border-blue-100 text-xs text-blue-900 space-y-1.5">
                 <p className="font-bold flex items-center gap-1 text-blue-950">
                   <svg className="w-4 h-4 text-[#1877F2]" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
-                  Read-Only Synchronization
+                  Live Facebook Feed Connection
                 </p>
                 <p className="text-blue-800 leading-relaxed">
-                  Saving your Facebook Group URL automatically populates the last 10 posts onto the Dashboard feed. Posts are read-only and sourced directly from Facebook.
+                  Saving your Facebook Group URL links the Facebook Group directly to the Dashboard. All posts, photos, and interactions are read-only and sourced live from Facebook.
                 </p>
               </div>
 
@@ -548,7 +524,7 @@ const Dashboard: React.FC = () => {
                     disabled={isSavingUrl}
                     className="bg-[#1877F2] hover:bg-blue-700 text-white text-xs font-bold px-5 py-2 rounded-xl shadow transition-colors disabled:bg-gray-400"
                   >
-                    {isSavingUrl ? 'Saving...' : 'Save & Sync Posts'}
+                    {isSavingUrl ? 'Saving...' : 'Save Facebook URL'}
                   </button>
                 </div>
               </div>
