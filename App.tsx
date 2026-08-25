@@ -11,6 +11,7 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Profile from './components/Profile';
 import Classmates from './components/Classmates';
+import HowTos from './components/HowTos';
 import HelpModal from './components/HelpModal';
 import ReceiptDashboardModal from './components/ReceiptDashboardModal';
 import ClassmateOnboardingModal from './components/ClassmateOnboardingModal';
@@ -1267,6 +1268,7 @@ const App: React.FC = () => {
             {currentPage === 'reporting' && <Reporting />}
             {currentPage === 'profile' && <Profile />}
             {currentPage === 'classmates' && <Classmates />}
+            {currentPage === 'howtos' && <HowTos onNavigate={setCurrentPage} />}
           </main>
         </div>
       </div>
