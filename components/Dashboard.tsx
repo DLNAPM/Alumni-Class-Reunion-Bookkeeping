@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { PaymentCategory, Announcement } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { getYearFromDateString, formatDisplayDate } from '../services/dateUtils';
+import { getYearFromDateString, formatDisplayDate, getTodayLocalDateString } from '../services/dateUtils';
 import { parseFacebookUrl } from '../services/facebookService';
 
 const StatCard: React.FC<{ title: string; value: string; icon: React.ReactElement }> = ({ title, value, icon }) => (
