@@ -667,8 +667,6 @@ const Admin: React.FC = () => {
 
   const [isSyncingFb, setIsSyncingFb] = useState(false);
   const [fbSyncFeedback, setFbSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [manualFbToken, setManualFbToken] = useState('');
-  const [showTokenInput, setShowTokenInput] = useState(false);
 
   // Manual Announcement & Facebook Post Creation
   const [isAddPostModalOpen, setIsAddPostModalOpen] = useState(false);
@@ -1067,96 +1065,33 @@ const Admin: React.FC = () => {
                     </p>
                   )}
 
-                  {/* Facebook OAuth Authentication & Sync Controls */}
+                  {/* Facebook Group / Page Connection Status & Info */}
                   <div className="mt-4 pt-4 border-t border-blue-200/70 space-y-3">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-blue-200 shadow-xs">
                       <div className="flex items-center gap-2.5">
-                        <div className={`w-3 h-3 rounded-full ${isFbAdminLoggedIn ? 'bg-emerald-500' : 'bg-amber-400'} animate-pulse`}></div>
+                        <div className={`w-3 h-3 rounded-full ${facebookPageUrl ? 'bg-emerald-500' : 'bg-amber-400'}`}></div>
                         <div>
                           <p className="text-xs font-bold text-gray-900">
-                            {isFbAdminLoggedIn ? `Connected to Facebook (${fbAdminName || 'Admin'})` : 'Admin Facebook Login Required'}
+                            {facebookPageUrl ? 'Class Facebook Group Configured' : 'No Facebook Group Connected'}
                           </p>
                           <p className="text-[11px] text-gray-500">
-                            {isFbAdminLoggedIn 
-                              ? 'Authorized to fetch recent posts from the Class Group/Page' 
-                              : 'Log into Facebook to fetch the 10 most recent posts to the Dashboard'}
+                            Use "+ Add / Paste Facebook Post" below to post reunion notices, announcements, and group updates to the Dashboard.
                           </p>
                         </div>
                       </div>
 
-                      {!isReadOnly && (
+                      {!isReadOnly && facebookPageUrl && (
                         <div className="flex items-center gap-2">
-                          {isFbAdminLoggedIn ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={handleSyncWithToken}
-                                disabled={isSyncingFb}
-                                className="bg-[#1877F2] hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition-colors shadow-sm inline-flex items-center gap-1.5 disabled:opacity-50"
-                              >
-                                <svg className={`w-3.5 h-3.5 ${isSyncingFb ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                <span>{isSyncingFb ? 'Fetching Posts...' : 'Fetch 10 Recent Posts'}</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={disconnectFacebook}
-                                className="text-xs text-gray-500 hover:text-red-600 font-semibold px-2 py-1"
-                              >
-                                Disconnect
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={handleFacebookLoginAndSync}
-                              disabled={isSyncingFb}
-                              className="bg-[#1877F2] hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors shadow-sm inline-flex items-center gap-1.5 disabled:opacity-50"
-                            >
-                              <div className="w-4 h-4 rounded bg-white text-[#1877F2] font-black text-[10px] flex items-center justify-center">f</div>
-                              <span>{isSyncingFb ? 'Authenticating & Fetching...' : 'Log in with FB to Fetch 10 Posts'}</span>
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => setIsAddPostModalOpen(true)}
+                            className="bg-[#1877F2] hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition-colors shadow-sm inline-flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <span>+ Add / Paste Facebook Post</span>
+                          </button>
                         </div>
                       )}
                     </div>
-
-                    {/* Manual Access Token Expandable Option */}
-                    {!isReadOnly && (
-                      <div className="text-[11px] pt-1">
-                        <button
-                          type="button"
-                          onClick={() => setShowTokenInput(!showTokenInput)}
-                          className="text-blue-700 hover:underline font-semibold flex items-center gap-1"
-                        >
-                          <span>{showTokenInput ? '▼ Hide Manual Token Input' : '▶ Or enter Facebook Access Token manually'}</span>
-                        </button>
-
-                        {showTokenInput && (
-                          <div className="mt-2 p-3 bg-white border border-gray-200 rounded-xl space-y-2">
-                            <label className="block font-bold text-gray-700">
-                              Facebook User or Page Access Token
-                            </label>
-                            <div className="flex gap-2">
-                              <input
-                                type="password"
-                                placeholder="EAA..."
-                                value={manualFbToken}
-                                onChange={e => setManualFbToken(e.target.value)}
-                                className="flex-1 border-gray-300 rounded-lg text-xs px-2.5 py-1.5 focus:ring-blue-500 focus:border-blue-500"
-                              />
-                              <button
-                                type="button"
-                                onClick={handleSyncWithToken}
-                                disabled={isSyncingFb || !manualFbToken.trim()}
-                                className="bg-gray-900 hover:bg-black text-white text-xs font-bold px-3 py-1.5 rounded-lg disabled:opacity-50 whitespace-nowrap"
-                              >
-                                Fetch with Token
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
 
                     {fbSyncFeedback && (
                       <div className={`p-3 rounded-xl text-xs font-medium ${
