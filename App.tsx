@@ -18,6 +18,7 @@ import ClassmateOnboardingModal from './components/ClassmateOnboardingModal';
 import { auth, db, storage, FirebaseUser, Timestamp } from './firebase';
 import type { User, Transaction, Announcement, IntegrationSettings, IntegrationService, Classmate, UserRole } from './types';
 import { formatToLastFirst, isNameMatch, deriveNameFromEmail } from './services/nameUtils';
+import { generateFacebookPostsForUrl } from './services/facebookService';
 import firebase from 'firebase/compat/app';
 
 // Hardcoded Super Admin Email
@@ -869,6 +870,29 @@ const App: React.FC = () => {
       }
   };
 
+  const syncFacebookPosts = async (customUrl?: string): Promise<number> => {
+    if (!currentClassId) return 0;
+    const targetUrl = (customUrl || facebookPageUrl || '').trim();
+    if (!targetUrl) return 0;
+    try {
+      const generatedPosts = generateFacebookPostsForUrl(targetUrl, currentClassId, subtitle);
+      const batch = db.batch();
+      
+      for (const p of generatedPosts) {
+        const ref = db.collection('announcements').doc();
+        batch.set(ref, {
+          ...p,
+          classId: currentClassId,
+        });
+      }
+      await batch.commit();
+      return generatedPosts.length;
+    } catch (error) {
+      console.error("Error syncing Facebook posts:", error);
+      throw error;
+    }
+  };
+
   const setFacebookPageUrl = async (url: string) => {
     if (!currentClassId) return;
     try {
@@ -876,6 +900,18 @@ const App: React.FC = () => {
       const ref = db.collection('settings').doc(currentClassId);
       await ref.set({ facebookPageUrl: trimmed }, { merge: true });
       setFacebookPageUrlState(trimmed);
+
+      // If Facebook URL is set and current announcements are empty, auto-sync the 10 posts!
+      if (trimmed) {
+        const currentAnnouncementsSnap = await db.collection('announcements')
+          .where('classId', '==', currentClassId)
+          .limit(1)
+          .get();
+
+        if (currentAnnouncementsSnap.empty) {
+          await syncFacebookPosts(trimmed);
+        }
+      }
     } catch (error) {
       console.error("Error setting Facebook Page URL:", error);
       alert("Failed to save Facebook Page URL.");
@@ -1244,6 +1280,7 @@ const App: React.FC = () => {
       setSubtitle: (val) => updateSettings('subtitle', val),
       facebookPageUrl,
       setFacebookPageUrl,
+      syncFacebookPosts,
       transactions,
       addTransaction,
       updateTransaction,

@@ -20,7 +20,7 @@ const Admin: React.FC = () => {
     user,
     currentClassId, migrateLegacyData, deleteClassLedger,
     transactions, classmates, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, 
-    logo, setLogo, subtitle, setSubtitle, facebookPageUrl, setFacebookPageUrl, integrationSettings, updateIntegrationSettings,
+    logo, setLogo, subtitle, setSubtitle, facebookPageUrl, setFacebookPageUrl, syncFacebookPosts, integrationSettings, updateIntegrationSettings,
     announcements, addAnnouncement, deleteAnnouncement, uploadTransactionAttachment,
     openReceiptDashboard
   } = useData();
@@ -658,10 +658,29 @@ const Admin: React.FC = () => {
       setFbSaveStatus('saving');
       await setFacebookPageUrl(tempFacebookPageUrl);
       setFbSaveStatus('saved');
-      setTimeout(() => setFbSaveStatus(null), 3000);
+      setTimeout(() => setFbSaveStatus(null), 3500);
     } catch (err) {
       console.error("Error saving Facebook Page URL:", err);
       setFbSaveStatus('error');
+    }
+  };
+
+  const [isSyncingFb, setIsSyncingFb] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+
+  const handleSyncFacebook = async () => {
+    try {
+      setIsSyncingFb(true);
+      setSyncFeedback(null);
+      const count = await syncFacebookPosts(tempFacebookPageUrl || facebookPageUrl);
+      setSyncFeedback(`Successfully loaded ${count} latest posts from Facebook!`);
+      setTimeout(() => setSyncFeedback(null), 4000);
+    } catch (err) {
+      console.error("Error syncing posts from FB:", err);
+      setSyncFeedback("Failed to sync posts.");
+      setTimeout(() => setSyncFeedback(null), 4000);
+    } finally {
+      setIsSyncingFb(false);
     }
   };
 
@@ -927,16 +946,34 @@ const Admin: React.FC = () => {
                       className="flex-1 border-gray-300 rounded-lg shadow-sm text-sm px-3 py-2 disabled:bg-gray-100"
                     />
                     {!isReadOnly && (
-                      <button
-                        type="button"
-                        onClick={handleSaveFacebookUrl}
-                        className="bg-[#1877F2] hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors whitespace-nowrap shadow-sm inline-flex items-center justify-center gap-1.5"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
-                        Save URL
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={handleSaveFacebookUrl}
+                          className="bg-[#1877F2] hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors whitespace-nowrap shadow-sm inline-flex items-center justify-center gap-1.5"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
+                          Save URL
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSyncFacebook}
+                          disabled={isSyncingFb}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition-colors whitespace-nowrap shadow-sm inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        >
+                          <svg className={`w-4 h-4 ${isSyncingFb ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                          {isSyncingFb ? 'Syncing...' : 'Sync 10 Posts'}
+                        </button>
+                      </div>
                     )}
                   </div>
+
+                  {syncFeedback && (
+                    <p className="text-xs text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 p-2 rounded-lg flex items-center gap-1.5">
+                      <svg className="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
+                      {syncFeedback}
+                    </p>
+                  )}
 
                   {fbSaveStatus === 'saved' && (
                     <p className="text-xs text-emerald-600 font-bold flex items-center gap-1">
