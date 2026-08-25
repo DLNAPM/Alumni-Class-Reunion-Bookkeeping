@@ -66,6 +66,7 @@ const App: React.FC = () => {
   // Customization State
   const [logo, setLogo] = useState('https://via.placeholder.com/150');
   const [subtitle, setSubtitle] = useState('Class of 1989');
+  const [facebookPageUrl, setFacebookPageUrlState] = useState('');
   
   // Help Modal State
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
@@ -703,10 +704,12 @@ const App: React.FC = () => {
               const data = doc.data();
               if (data?.logo) setLogo(data.logo);
               if (data?.subtitle) setSubtitle(data.subtitle);
+              if (data?.facebookPageUrl !== undefined) setFacebookPageUrlState(data.facebookPageUrl);
               if (data?.integrationSettings) setIntegrationSettings(data.integrationSettings);
           } else {
              setLogo('https://via.placeholder.com/150');
              setSubtitle(`Class of ${currentClassId}`);
+             setFacebookPageUrlState('');
           }
       });
       return () => unsubscribe();
@@ -860,9 +863,24 @@ const App: React.FC = () => {
           
           if (field === 'logo') setLogo(value);
           if (field === 'subtitle') setSubtitle(value);
+          if (field === 'facebookPageUrl') setFacebookPageUrlState(value);
       } catch (error) {
           console.error(`Error updating ${field}:`, error);
       }
+  };
+
+  const setFacebookPageUrl = async (url: string) => {
+    if (!currentClassId) return;
+    try {
+      const trimmed = (url || '').trim();
+      const ref = db.collection('settings').doc(currentClassId);
+      await ref.set({ facebookPageUrl: trimmed }, { merge: true });
+      setFacebookPageUrlState(trimmed);
+    } catch (error) {
+      console.error("Error setting Facebook Page URL:", error);
+      alert("Failed to save Facebook Page URL.");
+      throw error;
+    }
   };
 
   const updateIntegrationSettings = async (service: keyof IntegrationSettings, settings: IntegrationService) => {
@@ -1224,6 +1242,8 @@ const App: React.FC = () => {
       setLogo: (val) => updateSettings('logo', val),
       subtitle,
       setSubtitle: (val) => updateSettings('subtitle', val),
+      facebookPageUrl,
+      setFacebookPageUrl,
       transactions,
       addTransaction,
       updateTransaction,

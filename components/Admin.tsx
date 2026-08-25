@@ -20,7 +20,7 @@ const Admin: React.FC = () => {
     user,
     currentClassId, migrateLegacyData, deleteClassLedger,
     transactions, classmates, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, 
-    logo, setLogo, subtitle, setSubtitle, integrationSettings, updateIntegrationSettings,
+    logo, setLogo, subtitle, setSubtitle, facebookPageUrl, setFacebookPageUrl, integrationSettings, updateIntegrationSettings,
     announcements, addAnnouncement, deleteAnnouncement, uploadTransactionAttachment,
     openReceiptDashboard
   } = useData();
@@ -82,6 +82,20 @@ const Admin: React.FC = () => {
 
   const [tempLogo, setTempLogo] = useState(logo);
   const [tempSubtitle, setTempSubtitle] = useState(subtitle);
+  const [tempFacebookPageUrl, setTempFacebookPageUrl] = useState(facebookPageUrl || '');
+  const [fbSaveStatus, setFbSaveStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTempLogo(logo);
+  }, [logo]);
+
+  useEffect(() => {
+    setTempSubtitle(subtitle);
+  }, [subtitle]);
+
+  useEffect(() => {
+    setTempFacebookPageUrl(facebookPageUrl || '');
+  }, [facebookPageUrl]);
 
   const openDuplicateModal = (t: Transaction) => {
     setTargetTransactionForDuplicate(t);
@@ -626,10 +640,29 @@ const Admin: React.FC = () => {
     setBulkEditData({});
   };
 
-  const handleCustomizationSave = () => {
-    setLogo(tempLogo);
-    setSubtitle(tempSubtitle);
-    alert('Customization saved!');
+  const handleCustomizationSave = async () => {
+    try {
+      await setLogo(tempLogo);
+      await setSubtitle(tempSubtitle);
+      await setFacebookPageUrl(tempFacebookPageUrl);
+      alert('Customization & Facebook settings saved successfully!');
+    } catch (err) {
+      console.error("Error saving customization:", err);
+      alert('Failed to save customization.');
+    }
+  };
+
+  const handleSaveFacebookUrl = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    try {
+      setFbSaveStatus('saving');
+      await setFacebookPageUrl(tempFacebookPageUrl);
+      setFbSaveStatus('saved');
+      setTimeout(() => setFbSaveStatus(null), 3000);
+    } catch (err) {
+      console.error("Error saving Facebook Page URL:", err);
+      setFbSaveStatus('error');
+    }
   };
 
   const handleAddAnnouncement = (e: React.FormEvent) => {
@@ -836,33 +869,230 @@ const Admin: React.FC = () => {
               </table>
             </div>
           </div>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-                <h3 className="text-xl font-semibold mb-4">Manage Announcements</h3>
-                {!isReadOnly && (
-                <form onSubmit={handleAddAnnouncement} className="space-y-4">
-                  <input type="text" placeholder="Title" value={newAnnouncement.title} onChange={e => setNewAnnouncement({...newAnnouncement, title: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" required />
-                  <select value={newAnnouncement.type} onChange={e => setNewAnnouncement({...newAnnouncement, type: e.target.value as 'text' | 'facebook'})} className="w-full border-gray-300 rounded-md shadow-sm">
-                      <option value="text">Text Announcement</option>
-                      <option value="facebook">Facebook Post</option>
-                  </select>
-                  {newAnnouncement.type === 'text' ? (
-                      <textarea placeholder="Content" value={newAnnouncement.content} onChange={e => setNewAnnouncement({...newAnnouncement, content: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" rows={3}></textarea>
-                  ) : (
-                      <input type="url" placeholder="Facebook Post URL" value={newAnnouncement.url} onChange={e => setNewAnnouncement({...newAnnouncement, url: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" required />
+            <div className="bg-white p-6 rounded-lg shadow-md space-y-6">
+                <div className="border-b border-gray-100 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-lg bg-[#1877F2] text-white flex items-center justify-center font-bold text-lg">f</span>
+                        Class Facebook Page & Announcements
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Configure your Class's Facebook Page to automatically stream the last 10 posts on the Dashboard.
+                      </p>
+                    </div>
+                    {facebookPageUrl && (
+                      <a
+                        href={facebookPageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-[#1877F2] hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100 transition-colors"
+                      >
+                        Visit Page
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                {/* Class Facebook Page URL Settings Card */}
+                <div className="bg-blue-50/60 border border-blue-100 p-4 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-blue-900">
+                      Class Facebook Page URL
+                    </label>
+                    {facebookPageUrl ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+                        Connected to Dashboard
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full">
+                        Not Connected
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-blue-800/80 leading-relaxed">
+                    Enter the URL of your Class's public Facebook Page (or Group). The Dashboard will automatically show the latest posts and timeline updates.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="url"
+                      placeholder="e.g., https://www.facebook.com/YourClassPage"
+                      value={tempFacebookPageUrl}
+                      onChange={e => setTempFacebookPageUrl(e.target.value)}
+                      disabled={isReadOnly}
+                      className="flex-1 border-gray-300 rounded-lg shadow-sm text-sm px-3 py-2 disabled:bg-gray-100"
+                    />
+                    {!isReadOnly && (
+                      <button
+                        type="button"
+                        onClick={handleSaveFacebookUrl}
+                        className="bg-[#1877F2] hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors whitespace-nowrap shadow-sm inline-flex items-center justify-center gap-1.5"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
+                        Save URL
+                      </button>
+                    )}
+                  </div>
+
+                  {fbSaveStatus === 'saved' && (
+                    <p className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                      ✓ Class Facebook Page URL saved! The Dashboard feed is now updated.
+                    </p>
                   )}
-                  <input type="url" placeholder="Image URL (Optional)" value={newAnnouncement.imageUrl} onChange={e => setNewAnnouncement({...newAnnouncement, imageUrl: e.target.value})} className="w-full border-gray-300 rounded-md shadow-sm" />
-                  <button type="submit" className="bg-brand-primary text-white py-2 px-4 rounded-md hover:bg-brand-secondary">Add Announcement</button>
-                </form>
-                )}
-                <div className="mt-6 space-y-2 max-h-60 overflow-y-auto">
-                    <h4 className="font-semibold text-sm">Current Announcements</h4>
-                    {announcements.map(ann => (
-                        <div key={ann.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                            <span className="text-sm font-medium">{ann.title}</span>
-                            {!isReadOnly && <button onClick={() => deleteAnnouncement(ann.id)} className="text-danger hover:text-red-700 text-sm">Delete</button>}
+                  {fbSaveStatus === 'error' && (
+                    <p className="text-xs text-red-600 font-bold">
+                      Failed to save URL. Please check connection.
+                    </p>
+                  )}
+                </div>
+
+                {!isReadOnly && (
+                <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/50 space-y-3">
+                  <h4 className="font-bold text-sm text-gray-800">Publish New Post / Announcement</h4>
+                  <form onSubmit={handleAddAnnouncement} className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Post Title</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. 35th Reunion Banquet Registration is Open!" 
+                        value={newAnnouncement.title} 
+                        onChange={e => setNewAnnouncement({...newAnnouncement, title: e.target.value})} 
+                        className="w-full border-gray-300 rounded-lg shadow-sm text-sm px-3 py-2" 
+                        required 
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Post Type</label>
+                        <select 
+                          value={newAnnouncement.type} 
+                          onChange={e => setNewAnnouncement({...newAnnouncement, type: e.target.value as 'text' | 'facebook'})} 
+                          className="w-full border-gray-300 rounded-lg shadow-sm text-sm px-3 py-2"
+                        >
+                            <option value="facebook">Facebook Post / Media</option>
+                            <option value="text">General Class Announcement</option>
+                        </select>
+                      </div>
+
+                      {newAnnouncement.type === 'facebook' ? (
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-600 mb-1">Facebook Post URL</label>
+                          <input 
+                            type="url" 
+                            placeholder="https://www.facebook.com/..." 
+                            value={newAnnouncement.url} 
+                            onChange={e => setNewAnnouncement({...newAnnouncement, url: e.target.value})} 
+                            className="w-full border-gray-300 rounded-lg shadow-sm text-sm px-3 py-2" 
+                            required 
+                          />
                         </div>
-                    ))}
-                    {announcements.length === 0 && <p className="text-gray-500 italic text-sm">No announcements found.</p>}
+                      ) : (
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-600 mb-1">Image URL (Optional)</label>
+                          <input 
+                            type="url" 
+                            placeholder="https://example.com/photo.jpg" 
+                            value={newAnnouncement.imageUrl} 
+                            onChange={e => setNewAnnouncement({...newAnnouncement, imageUrl: e.target.value})} 
+                            className="w-full border-gray-300 rounded-lg shadow-sm text-sm px-3 py-2" 
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Content / Message</label>
+                      <textarea 
+                        placeholder="Write the announcement or post summary here..." 
+                        value={newAnnouncement.content} 
+                        onChange={e => setNewAnnouncement({...newAnnouncement, content: e.target.value})} 
+                        className="w-full border-gray-300 rounded-lg shadow-sm text-sm px-3 py-2" 
+                        rows={3}
+                      ></textarea>
+                    </div>
+
+                    {newAnnouncement.type === 'facebook' && (
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Featured Photo URL (Optional)</label>
+                        <input 
+                          type="url" 
+                          placeholder="https://example.com/photo.jpg" 
+                          value={newAnnouncement.imageUrl} 
+                          onChange={e => setNewAnnouncement({...newAnnouncement, imageUrl: e.target.value})} 
+                          className="w-full border-gray-300 rounded-lg shadow-sm text-sm px-3 py-2" 
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex justify-end">
+                      <button 
+                        type="submit" 
+                        className="bg-brand-primary text-white text-xs font-bold py-2 px-5 rounded-lg hover:bg-brand-secondary shadow-sm transition-colors"
+                      >
+                        Publish to Dashboard
+                      </button>
+                    </div>
+                  </form>
+                </div>
+                )}
+
+                <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-bold text-sm text-gray-900">Current Dashboard Feed Posts ({announcements.length})</h4>
+                      <span className="text-xs text-gray-500">Dashboard displays the latest 10 posts</span>
+                    </div>
+
+                    <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                        {announcements.slice(0, 15).map((ann, idx) => (
+                            <div key={ann.id} className="flex justify-between items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-100 transition-colors">
+                                <div className="min-w-0 pr-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-bold bg-blue-100 text-[#1877F2] px-1.5 py-0.5 rounded">
+                                      #{idx + 1}
+                                    </span>
+                                    {ann.type === 'facebook' ? (
+                                      <span className="text-[10px] font-bold bg-[#1877F2]/10 text-[#1877F2] px-2 py-0.5 rounded-full">
+                                        Facebook
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] font-bold bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full">
+                                        Text
+                                      </span>
+                                    )}
+                                    <span className="text-xs text-gray-400">{formatDisplayDate(ann.date)}</span>
+                                  </div>
+                                  <p className="text-sm font-semibold text-gray-800 truncate mt-1">{ann.title}</p>
+                                  {ann.url && (
+                                    <a href={ann.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline truncate block">
+                                      {ann.url}
+                                    </a>
+                                  )}
+                                </div>
+                                {!isReadOnly && (
+                                  <button 
+                                    onClick={() => {
+                                      if (window.confirm('Delete this post?')) {
+                                        deleteAnnouncement(ann.id);
+                                      }
+                                    }} 
+                                    className="text-danger hover:text-red-700 text-xs font-semibold p-1.5 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                            </div>
+                        ))}
+                        {announcements.length === 0 && (
+                          <div className="text-center py-6 border border-dashed rounded-xl text-gray-400 text-sm">
+                            No custom posts added yet. When you configure the Class Facebook Page URL above, it will be automatically featured on the Dashboard.
+                          </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -976,6 +1206,17 @@ const Admin: React.FC = () => {
                   <div>
                       <label className="block text-sm font-medium text-gray-700">Application Subtitle</label>
                       <input type="text" value={tempSubtitle} onChange={e => setTempSubtitle(e.target.value)} disabled={isReadOnly} className="mt-1 w-full border-gray-300 rounded-md shadow-sm disabled:bg-gray-100 disabled:cursor-not-allowed"/>
+                  </div>
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700">Class Facebook Page URL</label>
+                      <input 
+                        type="url" 
+                        placeholder="https://www.facebook.com/YourClassPage" 
+                        value={tempFacebookPageUrl} 
+                        onChange={e => setTempFacebookPageUrl(e.target.value)} 
+                        disabled={isReadOnly} 
+                        className="mt-1 w-full border-gray-300 rounded-md shadow-sm disabled:bg-gray-100 disabled:cursor-not-allowed text-sm"
+                      />
                   </div>
                   {!isReadOnly && <button onClick={handleCustomizationSave} className="w-full bg-indigo-500 text-white py-2 px-4 rounded-md hover:bg-indigo-600">Save Customization</button>}
               </div>

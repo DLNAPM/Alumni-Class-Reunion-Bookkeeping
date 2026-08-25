@@ -48,6 +48,7 @@ export interface Announcement {
   type?: 'text' | 'facebook';
   url?: string;
   imageUrl?: string;
+  authorName?: string;
 }
 
 export type UserRole = 'Admin' | 'Standard' | 'Guest' | 'Admin_ro';
@@ -94,6 +95,8 @@ export interface DataContextType {
   setLogo: (logoUpdater: string | ((prevLogo: string) => string)) => Promise<void>;
   subtitle: string;
   setSubtitle: (subtitleUpdater: string | ((prevSubtitle: string) => string)) => Promise<void>;
+  facebookPageUrl: string;
+  setFacebookPageUrl: (url: string) => Promise<void>;
   transactions: Transaction[];
   addTransaction: (transaction: Omit<Transaction, 'id' | 'classId'>) => Promise<void>;
   updateTransaction: (updatedTransaction: Transaction) => Promise<void>;
