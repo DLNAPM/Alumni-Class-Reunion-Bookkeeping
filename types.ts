@@ -110,7 +110,7 @@ export interface DataContextType {
   deleteTransactions: (transactionIds: string[]) => Promise<void>;
   clearTransactions: () => Promise<void>;
   announcements: Announcement[];
-  addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date' | 'classId'>) => Promise<void>;
+  addAnnouncement: (announcement: Partial<Announcement>) => Promise<void>;
   deleteAnnouncement: (announcementId: string) => Promise<void>;
   classBalance: number;
   integrationSettings: IntegrationSettings;

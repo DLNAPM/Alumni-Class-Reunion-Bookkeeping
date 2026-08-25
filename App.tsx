@@ -689,22 +689,12 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [currentClassId]);
 
-  // Purge any legacy mock announcements and maintain clean state
+  // Fetch Announcements from Firestore with real-time sync
   useEffect(() => {
-    if (!currentClassId) return;
-    
-    // Purge legacy mock announcements for this class from Firestore
-    db.collection('announcements')
-      .where('classId', '==', currentClassId)
-      .get()
-      .then(snap => {
-        if (!snap.empty) {
-          const batch = db.batch();
-          snap.docs.forEach(doc => batch.delete(doc.ref));
-          batch.commit().catch(err => console.warn("Error purging legacy announcements:", err));
-        }
-      })
-      .catch(err => console.warn("Error checking announcements:", err));
+    if (!currentClassId) {
+      setAnnouncements([]);
+      return;
+    }
 
     const unsubscribe = db.collection('announcements')
       .where('classId', '==', currentClassId)
@@ -713,8 +703,19 @@ const App: React.FC = () => {
           id: doc.id,
           ...doc.data()
         } as Announcement));
+
+        // Sort descending by date
+        loadedAnnouncements.sort((a, b) => {
+          const dateA = new Date(a.date || 0).getTime();
+          const dateB = new Date(b.date || 0).getTime();
+          return dateB - dateA;
+        });
+
         setAnnouncements(loadedAnnouncements);
+      }, (error) => {
+        console.error("Error fetching announcements snapshot:", error);
       });
+
     return () => unsubscribe();
   }, [currentClassId]);
 
@@ -854,17 +855,31 @@ const App: React.FC = () => {
     }
   };
 
-  const addAnnouncement = async (announcement: Omit<Announcement, 'id' | 'date' | 'classId'>) => {
+  const addAnnouncement = async (announcement: Partial<Announcement>) => {
     if (!currentClassId) return;
     try {
+      const cleanData: Record<string, any> = {};
+      Object.entries(announcement).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && key !== 'id') {
+          cleanData[key] = val;
+        }
+      });
+
+      const finalDate = (announcement as any).date 
+        ? new Date((announcement as any).date).toISOString() 
+        : new Date().toISOString();
+
       await db.collection('announcements').add({
-        ...announcement,
-        date: new Date().toISOString(),
+        title: announcement.title || 'Announcement',
+        content: announcement.content || '',
+        ...cleanData,
+        date: finalDate,
         classId: currentClassId,
       });
     } catch (error) {
-      console.error("Error adding announcement: ", error);
-      alert("Failed to add announcement.");
+      console.error("Error adding announcement to Firestore: ", error);
+      alert("Failed to save post to database. Please check your connection.");
+      throw error;
     }
   };
 

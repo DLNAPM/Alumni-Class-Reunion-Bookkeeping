@@ -85,6 +85,7 @@ const Dashboard: React.FC = () => {
         authorName: newPostData.authorName.trim() || 'Class Facebook Member',
         url: newPostData.url.trim() || (facebookPageUrl || ''),
         imageUrl: newPostData.imageUrl.trim() || undefined,
+        date: newPostData.date ? new Date(newPostData.date).toISOString() : new Date().toISOString(),
         type: 'facebook'
       });
       setFbSyncMessage({
