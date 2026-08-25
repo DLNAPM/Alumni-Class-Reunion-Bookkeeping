@@ -182,33 +182,87 @@ export async function fetchFacebookPostsFromGraph(
     throw new Error("Invalid Facebook Page or Group URL. Please enter a valid URL in Admin Settings.");
   }
 
-  if (!accessToken || !accessToken.trim()) {
-    throw new Error("Admin must be logged into Facebook to fetch posts. Please click 'Log in with Facebook'.");
+  const cleanToken = (accessToken || '').trim();
+  if (!cleanToken) {
+    throw new Error("Facebook Access Token is required. Please paste your token or log in with Facebook.");
   }
 
-  const fields = 'id,message,story,created_time,full_picture,permalink_url,from,attachments{media,type,url,title,description}';
-  const url1 = `https://graph.facebook.com/v19.0/${encodeURIComponent(targetId)}/feed?fields=${encodeURIComponent(fields)}&limit=10&access_token=${encodeURIComponent(accessToken.trim())}`;
-  
-  let response = await fetch(url1);
-  let data = await response.json();
+  // Save the valid token for subsequent calls
+  setStoredFacebookToken(cleanToken, 'Admin Token');
 
-  // If /feed fails with page-related error, try /posts endpoint
-  if (!response.ok || data.error) {
-    if (data.error && data.error.code === 100) {
-      const url2 = `https://graph.facebook.com/v19.0/${encodeURIComponent(targetId)}/posts?fields=${encodeURIComponent(fields)}&limit=10&access_token=${encodeURIComponent(accessToken.trim())}`;
-      const resp2 = await fetch(url2);
-      const data2 = await resp2.json();
-      if (resp2.ok && !data2.error) {
-        response = resp2;
-        data = data2;
+  const fields = 'id,message,story,created_time,full_picture,permalink_url,from,attachments{media,type,url,title,description}';
+  let tokenToUse = cleanToken;
+
+  // Step 1: If user provided a User Token for a Page, check if we can obtain the Page Access Token automatically from /me/accounts
+  if (parsed.isPage) {
+    try {
+      const accountsResp = await fetch(`https://graph.facebook.com/v19.0/me/accounts?access_token=${encodeURIComponent(cleanToken)}`);
+      if (accountsResp.ok) {
+        const accountsData = await accountsResp.json();
+        if (accountsData?.data && Array.isArray(accountsData.data)) {
+          const matchingPage = accountsData.data.find((p: any) => 
+            p.id === targetId || 
+            (p.name && p.name.toLowerCase() === targetId.toLowerCase()) ||
+            (p.category && p.access_token)
+          );
+          if (matchingPage?.access_token) {
+            tokenToUse = matchingPage.access_token;
+          } else if (accountsData.data.length === 1 && accountsData.data[0]?.access_token) {
+            tokenToUse = accountsData.data[0].access_token;
+          }
+        }
       }
+    } catch (e) {
+      console.warn("Could not check /me/accounts:", e);
     }
   }
 
-  if (!response.ok || data.error) {
-    const errMsg = data?.error?.message || `HTTP ${response.status}: Failed to fetch posts from Facebook Graph API.`;
+  const url1 = `https://graph.facebook.com/v19.0/${encodeURIComponent(targetId)}/feed?fields=${encodeURIComponent(fields)}&limit=10&access_token=${encodeURIComponent(tokenToUse)}`;
+  
+  let response = await fetch(url1);
+  let data: any = {};
+  try {
+    data = await response.json();
+  } catch (err) {
+    console.warn("Could not parse JSON response from /feed:", err);
+  }
+
+  // If /feed fails with page-related error, try /posts endpoint
+  if (!response.ok || data?.error) {
+    const url2 = `https://graph.facebook.com/v19.0/${encodeURIComponent(targetId)}/posts?fields=${encodeURIComponent(fields)}&limit=10&access_token=${encodeURIComponent(tokenToUse)}`;
+    const resp2 = await fetch(url2);
+    let data2: any = {};
+    try {
+      data2 = await resp2.json();
+    } catch {}
+    if (resp2.ok && !data2.error) {
+      response = resp2;
+      data = data2;
+    }
+  }
+
+  if (!response.ok || data?.error) {
+    const errCode = data?.error?.code;
+    const rawMsg = data?.error?.message || `HTTP ${response.status}: Failed to fetch posts from Facebook Graph API.`;
     console.error("Facebook Graph API error response:", data);
-    throw new Error(errMsg);
+
+    if (errCode === 3 || rawMsg.includes('Missing Permission') || rawMsg.includes('permission')) {
+      if (parsed.isGroup) {
+        throw new Error(
+          `(#3) Missing Permission for Facebook Group: In Graph API Explorer, please select 'User Token' and check the 'groups_access_member_info' permission. In Facebook, also make sure your App is added under Group Settings → Apps.`
+        );
+      } else {
+        throw new Error(
+          `(#3) Missing Permission for Page: In Graph API Explorer, click the "User or Page" dropdown and select your Page's name (Page Access Token), OR check 'pages_read_engagement' + 'pages_read_user_content', then click Generate Access Token.`
+        );
+      }
+    }
+
+    if (errCode === 190) {
+      throw new Error("Facebook Access Token expired. Please generate a new token in Graph API Explorer.");
+    }
+
+    throw new Error(rawMsg);
   }
 
   const rawPosts: GraphPostItem[] = data.data || [];

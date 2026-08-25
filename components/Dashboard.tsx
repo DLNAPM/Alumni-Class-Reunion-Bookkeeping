@@ -34,6 +34,7 @@ const Dashboard: React.FC = () => {
     classBalance, 
     transactions, 
     announcements, 
+    addAnnouncement,
     facebookPageUrl,
     setFacebookPageUrl,
     syncFacebookPosts,
@@ -57,6 +58,56 @@ const Dashboard: React.FC = () => {
   // Facebook Sync State on Dashboard
   const [isSyncingFb, setIsSyncingFb] = useState(false);
   const [fbSyncMessage, setFbSyncMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Direct Add / Paste Facebook Post Modal on Dashboard
+  const [isAddPostModalOpen, setIsAddPostModalOpen] = useState(false);
+  const [newPostData, setNewPostData] = useState({
+    title: '',
+    content: '',
+    authorName: '',
+    url: '',
+    imageUrl: '',
+    date: getTodayLocalDateString(),
+  });
+  const [isSavingPost, setIsSavingPost] = useState(false);
+
+  const handleCreatePostFromDashboard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPostData.content.trim() && !newPostData.title.trim()) {
+      alert("Please enter post text or a title.");
+      return;
+    }
+    try {
+      setIsSavingPost(true);
+      await addAnnouncement({
+        title: newPostData.title.trim() || (newPostData.content.slice(0, 50) + (newPostData.content.length > 50 ? '...' : '')),
+        content: newPostData.content.trim(),
+        authorName: newPostData.authorName.trim() || 'Class Facebook Member',
+        url: newPostData.url.trim() || (facebookPageUrl || ''),
+        imageUrl: newPostData.imageUrl.trim() || undefined,
+        type: 'facebook'
+      });
+      setFbSyncMessage({
+        type: 'success',
+        text: 'Facebook post added successfully to the Dashboard feed!'
+      });
+      setTimeout(() => setFbSyncMessage(null), 4000);
+      setIsAddPostModalOpen(false);
+      setNewPostData({
+        title: '',
+        content: '',
+        authorName: '',
+        url: '',
+        imageUrl: '',
+        date: getTodayLocalDateString(),
+      });
+    } catch (err: any) {
+      console.error("Error creating post:", err);
+      alert(err.message || "Failed to save post.");
+    } finally {
+      setIsSavingPost(false);
+    }
+  };
 
   // Filter the 10 most recent Facebook announcements
   const recentFbPosts = useMemo(() => {
@@ -438,14 +489,26 @@ const Dashboard: React.FC = () => {
 
               {/* 10 Most Recent Posts Section */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-base text-gray-900 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#1877F2]"></span>
-                    10 Most Recent Facebook Posts
-                  </h4>
-                  <span className="text-xs text-gray-500 font-medium">
-                    Showing {recentFbPosts.length} of 10 latest posts
-                  </span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-bold text-base text-gray-900 flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#1877F2]"></span>
+                      10 Most Recent Facebook Posts
+                    </h4>
+                    <span className="text-xs text-gray-500 font-medium">
+                      ({recentFbPosts.length} posts)
+                    </span>
+                  </div>
+
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => setIsAddPostModalOpen(true)}
+                      className="bg-[#1877F2] hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-xs inline-flex items-center gap-1.5 self-start sm:self-auto cursor-pointer transition-all"
+                    >
+                      <span>+ Add / Paste Facebook Post</span>
+                    </button>
+                  )}
                 </div>
 
                 {recentFbPosts.length > 0 ? (
@@ -523,24 +586,32 @@ const Dashboard: React.FC = () => {
                       f
                     </div>
                     <div className="max-w-md mx-auto space-y-1.5">
-                      <h5 className="font-bold text-sm text-gray-900">Admin Facebook Login Required to Fetch Posts</h5>
+                      <h5 className="font-bold text-sm text-gray-900">No Facebook Posts Loaded Yet</h5>
                       <p className="text-xs text-gray-500 leading-relaxed">
-                        To display the 10 most recent posts from your Class Facebook Page/Group, the Admin must log into Facebook to authorize the post sync.
+                        You can paste your Facebook Group / Page posts directly or enter a Facebook Access Token above to fetch them automatically.
                       </p>
                     </div>
                     {isAdmin ? (
-                      <button
-                        type="button"
-                        onClick={handleAdminFbLoginAndSync}
-                        disabled={isSyncingFb}
-                        className="bg-[#1877F2] hover:bg-blue-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-all shadow inline-flex items-center gap-2 disabled:opacity-50"
-                      >
-                        <div className="w-4 h-4 rounded bg-white text-[#1877F2] font-black text-[10px] flex items-center justify-center">f</div>
-                        <span>{isSyncingFb ? 'Authenticating & Fetching...' : 'Log in with Facebook to Fetch 10 Posts'}</span>
-                      </button>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddPostModalOpen(true)}
+                          className="bg-[#1877F2] hover:bg-blue-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-all shadow inline-flex items-center gap-2 cursor-pointer"
+                        >
+                          <span>+ Add / Paste Facebook Post</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => window.open('https://developers.facebook.com/tools/explorer/', '_blank')}
+                          className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-xs inline-flex items-center gap-1.5"
+                        >
+                          <span>Graph API Explorer</span>
+                          <span>↗</span>
+                        </button>
+                      </div>
                     ) : (
                       <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-2.5 max-w-sm mx-auto">
-                        Class Facebook posts will be visible once an Admin logs in and synchronizes the latest posts.
+                        Class Facebook posts will be visible once an Admin adds or synchronizes the latest posts.
                       </p>
                     )}
                   </div>
@@ -708,6 +779,118 @@ const Dashboard: React.FC = () => {
                     {isSavingUrl ? 'Saving...' : 'Save Facebook URL'}
                   </button>
                 </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add / Paste Facebook Post Modal */}
+      {isAddPostModalOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-100 overflow-y-auto max-h-[90vh] space-y-4">
+            <div className="flex justify-between items-center border-b pb-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <div className="w-5 h-5 rounded bg-[#1877F2] text-white font-black text-xs flex items-center justify-center">f</div>
+                  <span>Add / Paste Facebook Post</span>
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Paste content directly from your Facebook Group or Page to show in the 10 Recent Posts feed.
+                </p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setIsAddPostModalOpen(false)} 
+                className="text-gray-400 hover:text-gray-600 text-2xl font-bold leading-none"
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePostFromDashboard} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-gray-700 uppercase tracking-wider mb-1">
+                  Post Content / Message <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={4}
+                  placeholder="Paste the Facebook post text or announcement here..."
+                  value={newPostData.content}
+                  onChange={e => setNewPostData(prev => ({ ...prev, content: e.target.value }))}
+                  className="w-full border-gray-300 rounded-xl text-xs p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-xs"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-700 uppercase tracking-wider mb-1">
+                    Author / Poster Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Jane Doe or Committee"
+                    value={newPostData.authorName}
+                    onChange={e => setNewPostData(prev => ({ ...prev, authorName: e.target.value }))}
+                    className="w-full border-gray-300 rounded-lg text-xs p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 uppercase tracking-wider mb-1">
+                    Post Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newPostData.date}
+                    onChange={e => setNewPostData(prev => ({ ...prev, date: e.target.value }))}
+                    className="w-full border-gray-300 rounded-lg text-xs p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 uppercase tracking-wider mb-1">
+                  Facebook Post Link / URL (Optional)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://www.facebook.com/groups/.../posts/..."
+                  value={newPostData.url}
+                  onChange={e => setNewPostData(prev => ({ ...prev, url: e.target.value }))}
+                  className="w-full border-gray-300 rounded-lg text-xs p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 uppercase tracking-wider mb-1">
+                  Attached Photo / Image URL (Optional)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://... image link"
+                  value={newPostData.imageUrl}
+                  onChange={e => setNewPostData(prev => ({ ...prev, imageUrl: e.target.value }))}
+                  className="w-full border-gray-300 rounded-lg text-xs p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setIsAddPostModalOpen(false)}
+                  className="bg-gray-100 text-gray-800 py-2 px-4 rounded-xl hover:bg-gray-200 text-xs font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingPost}
+                  className="bg-[#1877F2] hover:bg-blue-700 text-white py-2 px-5 rounded-xl text-xs font-bold transition-all shadow-md disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  <span>{isSavingPost ? 'Saving...' : 'Add Post to Feed'}</span>
+                </button>
               </div>
             </form>
           </div>
