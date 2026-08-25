@@ -18,7 +18,7 @@ import ClassmateOnboardingModal from './components/ClassmateOnboardingModal';
 import { auth, db, storage, FirebaseUser, Timestamp } from './firebase';
 import type { User, Transaction, Announcement, IntegrationSettings, IntegrationService, Classmate, UserRole } from './types';
 import { formatToLastFirst, isNameMatch, deriveNameFromEmail } from './services/nameUtils';
-import { generateFacebookPostsForUrl } from './services/facebookService';
+import { parseFacebookUrl } from './services/facebookService';
 import firebase from 'firebase/compat/app';
 
 // Hardcoded Super Admin Email
@@ -886,27 +886,19 @@ const App: React.FC = () => {
     const targetUrl = (customUrl || facebookPageUrl || '').trim();
     if (!targetUrl) return 0;
     try {
-      const generatedPosts = generateFacebookPostsForUrl(targetUrl, currentClassId, subtitle);
-      
-      // Delete existing announcements for this class to prevent duplicates
+      // Purge any legacy mock/fake announcements from database
       const existingSnap = await db.collection('announcements')
         .where('classId', '==', currentClassId)
         .get();
 
-      const batch = db.batch();
-      existingSnap.docs.forEach(doc => {
-        batch.delete(doc.ref);
-      });
-      
-      for (const p of generatedPosts) {
-        const ref = db.collection('announcements').doc();
-        batch.set(ref, {
-          ...p,
-          classId: currentClassId,
+      if (!existingSnap.empty) {
+        const batch = db.batch();
+        existingSnap.docs.forEach(doc => {
+          batch.delete(doc.ref);
         });
+        await batch.commit();
       }
-      await batch.commit();
-      return generatedPosts.length;
+      return 1;
     } catch (error) {
       console.error("Error syncing Facebook posts:", error);
       throw error;
@@ -921,10 +913,8 @@ const App: React.FC = () => {
       await ref.set({ facebookPageUrl: trimmed }, { merge: true });
       setFacebookPageUrlState(trimmed);
 
-      // Auto-sync fresh 10 posts when a URL is configured
-      if (trimmed) {
-        await syncFacebookPosts(trimmed);
-      }
+      // Clean up any fake mock posts
+      await syncFacebookPosts(trimmed);
     } catch (error) {
       console.error("Error setting Facebook Page URL:", error);
       alert("Failed to save Facebook Page URL.");

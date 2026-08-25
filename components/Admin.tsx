@@ -20,7 +20,7 @@ const Admin: React.FC = () => {
     user,
     currentClassId, migrateLegacyData, deleteClassLedger,
     transactions, classmates, addTransaction, updateTransaction, updateTransactions, deleteTransaction, deleteTransactions, clearTransactions, 
-    logo, setLogo, subtitle, setSubtitle, facebookPageUrl, setFacebookPageUrl, syncFacebookPosts, integrationSettings, updateIntegrationSettings,
+    logo, setLogo, subtitle, setSubtitle, facebookPageUrl, setFacebookPageUrl, integrationSettings, updateIntegrationSettings,
     announcements, addAnnouncement, deleteAnnouncement, uploadTransactionAttachment,
     openReceiptDashboard
   } = useData();
@@ -662,25 +662,6 @@ const Admin: React.FC = () => {
       setFbSaveStatus('error');
     }
   };
-
-  const [isSyncingFb, setIsSyncingFb] = useState(false);
-  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
-
-  const handleSyncFacebook = async () => {
-    try {
-      setIsSyncingFb(true);
-      setSyncFeedback(null);
-      const count = await syncFacebookPosts(tempFacebookPageUrl || facebookPageUrl);
-      setSyncFeedback(`Successfully loaded ${count} latest posts from Facebook!`);
-      setTimeout(() => setSyncFeedback(null), 4000);
-    } catch (err) {
-      console.error("Error syncing posts from FB:", err);
-      setSyncFeedback("Failed to sync posts.");
-      setTimeout(() => setSyncFeedback(null), 4000);
-    } finally {
-      setIsSyncingFb(false);
-    }
-  };
   
   const handleIntegrationSettingsChange = (service: keyof IntegrationSettings, field: keyof IntegrationSettings[keyof IntegrationSettings], value: string | boolean) => {
       setTempIntegrationSettings(prev => ({
@@ -934,29 +915,24 @@ const Admin: React.FC = () => {
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
                           Save URL
                         </button>
-                        <button
-                          type="button"
-                          onClick={handleSyncFacebook}
-                          disabled={isSyncingFb}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition-colors whitespace-nowrap shadow-sm inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
-                        >
-                          <svg className={`w-4 h-4 ${isSyncingFb ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                          {isSyncingFb ? 'Syncing...' : 'Sync 10 Posts'}
-                        </button>
+                        {facebookPageUrl && (
+                          <a
+                            href={facebookPageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold px-3.5 py-2 rounded-lg transition-colors whitespace-nowrap shadow-sm inline-flex items-center justify-center gap-1.5"
+                          >
+                            <span>Open on Facebook</span>
+                            <svg className="w-3.5 h-3.5 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
+                          </a>
+                        )}
                       </div>
                     )}
                   </div>
 
-                  {syncFeedback && (
-                    <p className="text-xs text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 p-2 rounded-lg flex items-center gap-1.5">
-                      <svg className="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
-                      {syncFeedback}
-                    </p>
-                  )}
-
                   {fbSaveStatus === 'saved' && (
                     <p className="text-xs text-emerald-600 font-bold flex items-center gap-1">
-                      ✓ Class Facebook Group URL saved! The Dashboard feed is now synchronized.
+                      ✓ Class Facebook Group URL saved! The Dashboard feed is now connected live.
                     </p>
                   )}
                   {fbSaveStatus === 'error' && (
@@ -970,52 +946,64 @@ const Admin: React.FC = () => {
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-700 space-y-1.5">
                   <div className="flex items-center gap-2 font-bold text-slate-900">
                     <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/></svg>
-                    <span>Read-Only Policy for Facebook Group Posts</span>
+                    <span>Live Facebook Feed & Read-Only Policy</span>
                   </div>
                   <p className="leading-relaxed">
-                    All announcements and feed posts are synchronized directly from Facebook and are set to <strong>READ-ONLY</strong> inside the Alumni Bookkeeping App. Posts cannot be created, updated, or deleted here. All posting, photo additions, and moderation are handled directly inside your Class Facebook Group on Facebook.
+                    All Facebook posts and media are rendered directly from your official Class Facebook Group / Page on Facebook in real time. Posts are <strong>READ-ONLY</strong> inside the Alumni Bookkeeping App. Post creation, photo uploads, commenting, and moderation occur directly on Facebook.
                   </p>
                 </div>
 
-                {/* Synchronized Posts List (Strictly Read-Only) */}
-                <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-bold text-sm text-gray-900">Synchronized Facebook Posts ({announcements.length})</h4>
-                      <span className="text-xs text-gray-500 font-medium">Read-Only Stream</span>
+                {/* Live Facebook Connection Status & Quick Links */}
+                {facebookPageUrl && (
+                  <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm text-gray-900 flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#1877F2]"></span>
+                        Connected Facebook Group Resources
+                      </h4>
+                      <span className="text-xs text-[#1877F2] font-semibold">Live Facebook Feed</span>
                     </div>
 
-                    <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                        {announcements.slice(0, 10).map((ann, idx) => (
-                            <div key={ann.id || `admin-post-${idx}`} className="flex justify-between items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-100 transition-colors">
-                                <div className="min-w-0 pr-3 flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-bold bg-blue-100 text-[#1877F2] px-1.5 py-0.5 rounded">
-                                      #{idx + 1}
-                                    </span>
-                                    <span className="text-[10px] font-bold bg-[#1877F2]/10 text-[#1877F2] px-2 py-0.5 rounded-full">
-                                      Facebook Post
-                                    </span>
-                                    <span className="text-xs text-gray-400">{formatDisplayDate(ann.date)}</span>
-                                  </div>
-                                  <p className="text-sm font-semibold text-gray-800 truncate mt-1">{ann.title}</p>
-                                  {ann.url && (
-                                    <a href={ann.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline truncate block">
-                                      {ann.url} ↗
-                                    </a>
-                                  )}
-                                </div>
-                                <span className="text-[11px] font-medium text-gray-400 bg-gray-200/70 px-2.5 py-1 rounded-md shrink-0">
-                                  Read-Only
-                                </span>
-                            </div>
-                        ))}
-                        {announcements.length === 0 && (
-                          <div className="text-center py-8 border border-dashed border-gray-200 rounded-xl text-gray-400 text-sm">
-                            No Facebook posts loaded yet. Click &quot;Sync 10 Posts&quot; above to load the latest group feed.
-                          </div>
-                        )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <a
+                        href={facebookPageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2.5 bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded-lg flex items-center justify-between font-semibold text-gray-800 hover:text-blue-700 transition-colors"
+                      >
+                        <span>📰 Group Wall & Recent Posts</span>
+                        <span>↗</span>
+                      </a>
+                      <a
+                        href={`${facebookPageUrl}/photos`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2.5 bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded-lg flex items-center justify-between font-semibold text-gray-800 hover:text-blue-700 transition-colors"
+                      >
+                        <span>📸 Photos & Albums</span>
+                        <span>↗</span>
+                      </a>
+                      <a
+                        href={`${facebookPageUrl}/events`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2.5 bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded-lg flex items-center justify-between font-semibold text-gray-800 hover:text-blue-700 transition-colors"
+                      >
+                        <span>📅 Class Events & Reunions</span>
+                        <span>↗</span>
+                      </a>
+                      <a
+                        href={`${facebookPageUrl}/members`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2.5 bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded-lg flex items-center justify-between font-semibold text-gray-800 hover:text-blue-700 transition-colors"
+                      >
+                        <span>👥 Member Roster & Outreach</span>
+                        <span>↗</span>
+                      </a>
                     </div>
-                </div>
+                  </div>
+                )}
             </div>
 
         </div>
