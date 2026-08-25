@@ -34,12 +34,9 @@ const Dashboard: React.FC = () => {
     classBalance, 
     transactions, 
     announcements, 
-    deleteAnnouncement,
-    addAnnouncement,
     facebookPageUrl,
     setFacebookPageUrl,
     syncFacebookPosts,
-    currentClassId,
     subtitle
   } = useData();
 
@@ -49,11 +46,10 @@ const Dashboard: React.FC = () => {
   const [enlargedImageUrl, setEnlargedImageUrl] = useState<string | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<PaymentCategory[]>([PaymentCategory.Dues, PaymentCategory.Fundraiser]);
   
-  // Facebook Announcements State
+  // Facebook Announcements View State
   const [feedViewMode, setFeedViewMode] = useState<'cards' | 'timeline'>('cards');
   const [isFbUrlModalOpen, setIsFbUrlModalOpen] = useState(false);
   const [fbUrlInput, setFbUrlInput] = useState(facebookPageUrl || '');
-  const [isAddPostModalOpen, setIsAddPostModalOpen] = useState(false);
   const [isSavingUrl, setIsSavingUrl] = useState(false);
   const [isSyncingPosts, setIsSyncingPosts] = useState(false);
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
@@ -69,16 +65,6 @@ const Dashboard: React.FC = () => {
   const fbInfo = useMemo(() => {
     return parseFacebookUrl(facebookPageUrl || '');
   }, [facebookPageUrl]);
-
-  // New Post Form
-  const [newPost, setNewPost] = useState({
-    title: '',
-    content: '',
-    type: 'facebook' as 'text' | 'facebook',
-    url: '',
-    imageUrl: '',
-    authorName: 'Reunion Committee'
-  });
 
   const handleCategoryChange = (category: PaymentCategory) => {
     setSelectedCategories(prev =>
@@ -124,9 +110,20 @@ const Dashboard: React.FC = () => {
           .reduce((sum, t) => sum + t.amount, 0);
   }, [transactions]);
 
-  // Last 10 Posts logic
+  // Last 10 Posts logic with guaranteed deduplication
   const last10Posts = useMemo(() => {
-    let list = announcements.slice(0, 10);
+    const seenTitles = new Set<string>();
+    const uniqueList: Announcement[] = [];
+
+    for (const ann of announcements) {
+      const titleKey = (ann.title || '').trim().toLowerCase();
+      if (!seenTitles.has(titleKey)) {
+        seenTitles.add(titleKey);
+        uniqueList.push(ann);
+      }
+    }
+
+    let list = uniqueList.slice(0, 10);
     if (postSearchFilter.trim()) {
       const q = postSearchFilter.toLowerCase();
       list = list.filter(p => 
@@ -158,47 +155,14 @@ const Dashboard: React.FC = () => {
       setIsSyncingPosts(true);
       setSyncStatusMsg(null);
       const count = await syncFacebookPosts(facebookPageUrl || fbUrlInput);
-      setSyncStatusMsg(`Successfully loaded ${count} latest posts from Facebook!`);
+      setSyncStatusMsg(`Successfully synchronized ${count} latest posts from Facebook!`);
       setTimeout(() => setSyncStatusMsg(null), 4000);
     } catch (err) {
       console.error("Failed to sync posts:", err);
-      setSyncStatusMsg("Failed to sync posts. Please check connection.");
+      setSyncStatusMsg("Failed to sync posts. Please verify Facebook URL.");
       setTimeout(() => setSyncStatusMsg(null), 4000);
     } finally {
       setIsSyncingPosts(false);
-    }
-  };
-
-  const handleCreatePost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPost.title.trim()) return;
-
-    try {
-      const payload: Omit<Announcement, 'id' | 'date' | 'classId'> = {
-        title: newPost.title.trim(),
-        content: newPost.content.trim(),
-        type: newPost.type,
-        authorName: newPost.authorName?.trim() || 'Class Admin'
-      };
-      if (newPost.type === 'facebook' && newPost.url) {
-        payload.url = newPost.url.trim();
-      }
-      if (newPost.imageUrl?.trim()) {
-        payload.imageUrl = newPost.imageUrl.trim();
-      }
-
-      await addAnnouncement(payload);
-      setNewPost({ 
-        title: '', 
-        content: '', 
-        type: 'facebook', 
-        url: '', 
-        imageUrl: '',
-        authorName: 'Reunion Committee' 
-      });
-      setIsAddPostModalOpen(false);
-    } catch (err) {
-      console.error("Failed to add post:", err);
     }
   };
 
@@ -277,7 +241,7 @@ const Dashboard: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* REVAMPED ANNOUNCEMENTS: CLASS FACEBOOK PAGE/GROUP & LAST 10 POSTS         */}
+      {/* FACEBOOK GROUP FEED & ANNOUNCEMENTS (READ-ONLY)                          */}
       {/* ========================================================================= */}
       <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
         {/* Top Header Banner */}
@@ -290,10 +254,14 @@ const Dashboard: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-                    Class Announcements & Facebook Feed
+                    Class Facebook Feed & Announcements
                   </h3>
                   <span className="bg-white/20 backdrop-blur-md text-white border border-white/30 text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                     {fbInfo.isGroup ? 'Class Group' : 'Official Page'}
+                  </span>
+                  <span className="bg-amber-400/20 text-amber-200 border border-amber-300/30 text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/></svg>
+                    Read-Only Feed
                   </span>
                   <span className="bg-emerald-400/20 text-emerald-200 border border-emerald-300/30 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
                     Last 10 Posts
@@ -301,8 +269,8 @@ const Dashboard: React.FC = () => {
                 </div>
                 <p className="text-blue-100/90 text-xs sm:text-sm mt-1">
                   {facebookPageUrl 
-                    ? `Connected to ${fbInfo.isGroup ? `Facebook Group #${fbInfo.groupIdOrName || 'Class Group'}` : (subtitle || 'Class Page')} with 100+ members & updates`
-                    : "Connect your Class Facebook Page or Group URL to stream the last 10 posts directly to classmates"}
+                    ? `Connected to ${fbInfo.isGroup ? `Facebook Group #${fbInfo.groupIdOrName || 'Class Group'}` : (subtitle || 'Class Page')} (100+ posts & active discussions)`
+                    : "Connect your Class Facebook Group or Page URL to automatically stream the last 10 posts"}
                 </p>
               </div>
             </div>
@@ -326,11 +294,11 @@ const Dashboard: React.FC = () => {
                   <button
                     onClick={handleManualSync}
                     disabled={isSyncingPosts}
-                    className="bg-white/15 hover:bg-white/25 border border-white/30 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-all inline-flex items-center gap-1.5 backdrop-blur-sm disabled:opacity-50 shadow-sm"
-                    title="Sync / Refresh 10 latest posts from Facebook"
+                    className="bg-white/15 hover:bg-white/25 border border-white/30 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition-all inline-flex items-center gap-1.5 backdrop-blur-sm disabled:opacity-50 shadow-sm"
+                    title="Sync and refresh the latest 10 posts from Facebook"
                   >
                     <svg className={`w-3.5 h-3.5 ${isSyncingPosts ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                    <span>{isSyncingPosts ? 'Syncing...' : 'Sync FB Posts'}</span>
+                    <span>{isSyncingPosts ? 'Syncing...' : 'Refresh Feed'}</span>
                   </button>
 
                   <button
@@ -338,20 +306,11 @@ const Dashboard: React.FC = () => {
                       setFbUrlInput(facebookPageUrl || '');
                       setIsFbUrlModalOpen(true);
                     }}
-                    className="bg-white/15 hover:bg-white/25 border border-white/30 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-all inline-flex items-center gap-1.5 backdrop-blur-sm shadow-sm"
-                    title="Edit Class Facebook URL"
+                    className="bg-white/15 hover:bg-white/25 border border-white/30 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition-all inline-flex items-center gap-1.5 backdrop-blur-sm shadow-sm"
+                    title="Configure Class Facebook Group URL"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    <span>{facebookPageUrl ? 'Edit URL' : 'Set URL'}</span>
-                  </button>
-
-                  <button
-                    onClick={() => setIsAddPostModalOpen(true)}
-                    className="bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all inline-flex items-center gap-1.5 shadow-sm"
-                    title="Publish Announcement or Facebook Post"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                    <span>Add Post</span>
+                    <span>{facebookPageUrl ? 'Edit FB URL' : 'Set FB URL'}</span>
                   </button>
                 </>
               )}
@@ -360,7 +319,7 @@ const Dashboard: React.FC = () => {
 
           {/* Sync Status Banner */}
           {syncStatusMsg && (
-            <div className="mt-3 bg-white/20 text-white font-semibold text-xs px-3 py-1.5 rounded-lg flex items-center gap-2">
+            <div className="mt-3 bg-white/20 text-white font-semibold text-xs px-3 py-1.5 rounded-lg flex items-center gap-2 animate-in fade-in duration-150">
               <svg className="w-4 h-4 text-emerald-300" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
               <span>{syncStatusMsg}</span>
             </div>
@@ -412,15 +371,35 @@ const Dashboard: React.FC = () => {
 
         {/* Body Content */}
         <div className="p-5 sm:p-6 space-y-6">
+          {/* Read-Only Notice Bar */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3 text-xs text-slate-700">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <span>
+                <strong>Read-Only Facebook Stream:</strong> Posts are synchronized directly from Facebook and cannot be edited or deleted inside the Alumni Bookkeeping App. Posts are managed on Facebook.
+              </span>
+            </div>
+            {facebookPageUrl && (
+              <a
+                href={facebookPageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#1877F2] hover:underline font-bold whitespace-nowrap shrink-0 inline-flex items-center gap-1"
+              >
+                Manage on Facebook ↗
+              </a>
+            )}
+          </div>
+
           {/* Unconfigured Alert for Admin */}
           {!facebookPageUrl && (
             <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-start gap-3">
                 <span className="text-2xl">📢</span>
                 <div>
-                  <h4 className="font-bold text-amber-900 text-sm">Connect Your Class Facebook Page or Group</h4>
+                  <h4 className="font-bold text-amber-900 text-sm">Connect Your Class Facebook Group or Page</h4>
                   <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
-                    Enter the URL of your Class Facebook Page or Facebook Group (e.g. <code>https://www.facebook.com/groups/137851679602885</code>) to automatically display the last 10 posts and updates directly here.
+                    Enter the URL of your Class Facebook Group (e.g. <code>https://www.facebook.com/groups/137851679602885</code>) to automatically display the 10 latest posts, photos, and announcements.
                   </p>
                 </div>
               </div>
@@ -453,7 +432,7 @@ const Dashboard: React.FC = () => {
                     </span>
                   </h4>
                   <p className="text-xs text-blue-800/80 mt-0.5">
-                    Streaming the latest 10 posts, committee announcements, and event discussions from the class group wall.
+                    Streaming the latest 10 posts, committee announcements, and event discussions from the official class group wall.
                   </p>
                 </div>
               </div>
@@ -580,7 +559,7 @@ const Dashboard: React.FC = () => {
             </div>
           )}
 
-          {/* View Mode: Cards List (Last 10 Posts) */}
+          {/* View Mode: Cards List (Last 10 Posts - READ ONLY) */}
           {feedViewMode === 'cards' && (
             <div className="space-y-4">
               {/* Search & Counter Filter */}
@@ -590,12 +569,15 @@ const Dashboard: React.FC = () => {
                     Latest Class Posts & Facebook Updates
                   </span>
                   <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-0.5 rounded-full">
-                    {last10Posts.length} of {announcements.length} {announcements.length === 1 ? 'post' : 'posts'}
+                    {last10Posts.length} posts
+                  </span>
+                  <span className="text-[11px] text-gray-400 font-medium">
+                    (Read-Only)
                   </span>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {announcements.length > 2 && (
+                  {last10Posts.length > 2 && (
                     <div className="relative">
                       <input
                         type="text"
@@ -608,34 +590,27 @@ const Dashboard: React.FC = () => {
                     </div>
                   )}
 
-                  {isAdmin && announcements.length > 0 && (
+                  {isAdmin && (
                     <button
                       onClick={handleManualSync}
                       disabled={isSyncingPosts}
                       className="text-xs text-[#1877F2] hover:text-blue-800 font-bold px-2.5 py-1.5 rounded-lg hover:bg-blue-50 transition-colors inline-flex items-center gap-1"
                     >
                       <svg className={`w-3.5 h-3.5 ${isSyncingPosts ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                      <span>{isSyncingPosts ? 'Syncing...' : 'Sync Posts'}</span>
+                      <span>{isSyncingPosts ? 'Syncing...' : 'Sync Latest Posts'}</span>
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* List of Last 10 Posts */}
+              {/* List of Last 10 Posts (STRICTLY READ-ONLY) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {last10Posts.map((ann, index) => {
-                  const isFbPost = ann.type === 'facebook' || !!facebookPageUrl;
-                  const handleDelete = () => {
-                    if (window.confirm(`Are you sure you want to delete "${ann.title}"?`)) {
-                      deleteAnnouncement(ann.id);
-                    }
-                  };
-
                   const postDirectUrl = ann.url || facebookPageUrl || `https://www.facebook.com/groups/${fbInfo.groupIdOrName || '137851679602885'}`;
 
                   return (
                     <div 
-                      key={ann.id} 
+                      key={ann.id || `post-${index}`} 
                       className="bg-white hover:bg-gray-50/50 border border-gray-200/90 rounded-2xl p-5 relative group transition-all duration-200 hover:shadow-lg flex flex-col justify-between"
                     >
                       {/* Top Meta */}
@@ -648,27 +623,22 @@ const Dashboard: React.FC = () => {
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold text-gray-900">
-                                  {ann.authorName || (fbInfo.isGroup ? `Class Group #${fbInfo.groupIdOrName || '137851679602885'}` : 'Reunion Committee')}
+                                  {ann.authorName || (fbInfo.isGroup ? `Facebook Group #${fbInfo.groupIdOrName || '137851679602885'}` : 'Reunion Committee')}
                                 </span>
                                 <span className="text-[10px] font-bold bg-blue-100 text-[#1877F2] px-1.5 py-0.2 rounded">
                                   #{index + 1}
                                 </span>
                               </div>
                               <p className="text-[11px] text-gray-400">
-                                {formatDisplayDate(ann.date)} • Facebook Post
+                                {formatDisplayDate(ann.date)} • Facebook Group Post
                               </p>
                             </div>
                           </div>
 
-                          {isAdmin && (
-                            <button 
-                              onClick={handleDelete} 
-                              className="text-gray-400 hover:text-danger p-1 rounded-md hover:bg-red-50 transition-colors"
-                              title="Delete post"
-                            >
-                              <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
-                            </button>
-                          )}
+                          <span className="text-[10px] font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                            <svg className="w-2.5 h-2.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/></svg>
+                            Read-Only
+                          </span>
                         </div>
 
                         {/* Title */}
@@ -683,7 +653,7 @@ const Dashboard: React.FC = () => {
                           </p>
                         )}
 
-                        {/* Image attachment */}
+                        {/* Accurate Image attachment */}
                         {ann.imageUrl && (
                           <div className="mt-3.5 overflow-hidden rounded-xl bg-gray-100 border border-gray-200">
                             <img 
@@ -741,7 +711,7 @@ const Dashboard: React.FC = () => {
                     <h4 className="text-lg font-bold text-gray-900">
                       {facebookPageUrl 
                         ? (fbInfo.isGroup ? `Facebook Group #${fbInfo.groupIdOrName || 'Connected'}` : 'Facebook Page Connected')
-                        : 'Class Facebook Page URL'}
+                        : 'Class Facebook Group Feed'}
                     </h4>
                     <p className="text-xs sm:text-sm text-gray-600 mt-1 max-w-lg mx-auto leading-relaxed">
                       {facebookPageUrl
@@ -773,15 +743,6 @@ const Dashboard: React.FC = () => {
                         </button>
                       )
                     )}
-
-                    {isAdmin && (
-                      <button
-                        onClick={() => setIsAddPostModalOpen(true)}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition-colors"
-                      >
-                        Add Custom Post
-                      </button>
-                    )}
                   </div>
                 </div>
               )}
@@ -791,7 +752,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* ========================================================================= */}
-      {/* MODAL: CONFIGURE CLASS FACEBOOK PAGE URL                                 */}
+      {/* MODAL: CONFIGURE CLASS FACEBOOK GROUP URL                                 */}
       {/* ========================================================================= */}
       {isFbUrlModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
@@ -802,7 +763,7 @@ const Dashboard: React.FC = () => {
                   f
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-gray-900">Configure Class Facebook URL</h3>
+                  <h3 className="font-bold text-base text-gray-900">Configure Class Facebook Group URL</h3>
                   <p className="text-xs text-gray-500">Supports Facebook Groups (with 100+ posts) and Pages</p>
                 </div>
               </div>
@@ -817,7 +778,7 @@ const Dashboard: React.FC = () => {
             <form onSubmit={handleSaveFacebookUrl} className="mt-5 space-y-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                  Facebook Page or Group URL *
+                  Facebook Group or Page URL *
                 </label>
                 <input
                   type="url"
@@ -835,10 +796,10 @@ const Dashboard: React.FC = () => {
               <div className="bg-blue-50 p-3.5 rounded-xl border border-blue-100 text-xs text-blue-900 space-y-1.5">
                 <p className="font-bold flex items-center gap-1 text-blue-950">
                   <svg className="w-4 h-4 text-[#1877F2]" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
-                  Automatic Last 10 Posts Sync
+                  Read-Only Synchronization
                 </p>
                 <p className="text-blue-800 leading-relaxed">
-                  Saving your Facebook Group/Page URL will automatically populate the last 10 posts onto the Dashboard feed with direct links back to your Facebook Group wall.
+                  Saving your Facebook Group URL automatically populates the last 10 posts onto the Dashboard feed. Posts are read-only and sourced directly from Facebook.
                 </p>
               </div>
 
@@ -870,130 +831,6 @@ const Dashboard: React.FC = () => {
                     {isSavingUrl ? 'Saving...' : 'Save & Sync Posts'}
                   </button>
                 </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* MODAL: PUBLISH NEW ANNOUNCEMENT / FACEBOOK POST                          */}
-      {/* ========================================================================= */}
-      {isAddPostModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-gray-100 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-gray-100">
-              <div>
-                <h3 className="font-bold text-base text-gray-900">Publish Post to Dashboard Feed</h3>
-                <p className="text-xs text-gray-500">Will appear in the latest 10 posts feed</p>
-              </div>
-              <button 
-                onClick={() => setIsAddPostModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
-              >
-                &times;
-              </button>
-            </div>
-
-            <form onSubmit={handleCreatePost} className="mt-5 space-y-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                  Post Title *
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 35th Reunion Banquet Updates"
-                  value={newPost.title}
-                  onChange={e => setNewPost({...newPost, title: e.target.value})}
-                  className="w-full border-gray-300 rounded-xl shadow-sm text-sm px-3.5 py-2.5"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                    Post Type
-                  </label>
-                  <select
-                    value={newPost.type}
-                    onChange={e => setNewPost({...newPost, type: e.target.value as 'text' | 'facebook'})}
-                    className="w-full border-gray-300 rounded-xl shadow-sm text-sm px-3.5 py-2.5"
-                  >
-                    <option value="facebook">Facebook Group / Page Post</option>
-                    <option value="text">General Announcement</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                    Author / Committee
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Reunion Committee"
-                    value={newPost.authorName}
-                    onChange={e => setNewPost({...newPost, authorName: e.target.value})}
-                    className="w-full border-gray-300 rounded-xl shadow-sm text-sm px-3.5 py-2.5"
-                  />
-                </div>
-              </div>
-
-              {newPost.type === 'facebook' && (
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                    Facebook Post URL (Optional)
-                  </label>
-                  <input
-                    type="url"
-                    placeholder="https://www.facebook.com/groups/137851679602885/posts/..."
-                    value={newPost.url}
-                    onChange={e => setNewPost({...newPost, url: e.target.value})}
-                    className="w-full border-gray-300 rounded-xl shadow-sm text-sm px-3.5 py-2.5"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                  Content / Message Details
-                </label>
-                <textarea
-                  placeholder="Write the post caption, timeline updates, or details here..."
-                  value={newPost.content}
-                  onChange={e => setNewPost({...newPost, content: e.target.value})}
-                  className="w-full border-gray-300 rounded-xl shadow-sm text-sm px-3.5 py-2.5"
-                  rows={3}
-                ></textarea>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
-                  Photo URL (Optional)
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/photo-..."
-                  value={newPost.imageUrl}
-                  onChange={e => setNewPost({...newPost, imageUrl: e.target.value})}
-                  className="w-full border-gray-300 rounded-xl shadow-sm text-sm px-3.5 py-2.5"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setIsAddPostModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="bg-brand-primary hover:bg-brand-secondary text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow transition-colors"
-                >
-                  Publish Post
-                </button>
               </div>
             </form>
           </div>

@@ -222,8 +222,6 @@ const Admin: React.FC = () => {
     }
   };
 
-  const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', type: 'text' as 'text' | 'facebook', url: '', imageUrl: '' });
-
   const [tempIntegrationSettings, setTempIntegrationSettings] = useState(integrationSettings);
 
   const handleNewTransactionChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -683,25 +681,6 @@ const Admin: React.FC = () => {
       setIsSyncingFb(false);
     }
   };
-
-  const handleAddAnnouncement = (e: React.FormEvent) => {
-    e.preventDefault();
-    if(newAnnouncement.title && (newAnnouncement.content || newAnnouncement.url)) {
-      const announcementToAdd: Omit<Announcement, 'id' | 'date' | 'classId'> = {
-        title: newAnnouncement.title,
-        content: newAnnouncement.content,
-        type: newAnnouncement.type,
-      };
-      if (newAnnouncement.type === 'facebook' && newAnnouncement.url) {
-        announcementToAdd.url = newAnnouncement.url;
-      }
-      if (newAnnouncement.imageUrl) {
-        announcementToAdd.imageUrl = newAnnouncement.imageUrl;
-      }
-      addAnnouncement(announcementToAdd);
-      setNewAnnouncement({ title: '', content: '', type: 'text', url: '', imageUrl: '' });
-    }
-  };
   
   const handleIntegrationSettingsChange = (service: keyof IntegrationSettings, field: keyof IntegrationSettings[keyof IntegrationSettings], value: string | boolean) => {
       setTempIntegrationSettings(prev => ({
@@ -914,11 +893,11 @@ const Admin: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Class Facebook Page URL Settings Card */}
+                {/* Class Facebook Group URL Settings Card */}
                 <div className="bg-blue-50/60 border border-blue-100 p-4 rounded-xl space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-bold uppercase tracking-wider text-blue-900">
-                      Class Facebook Page URL
+                      Class Facebook Group / Page URL
                     </label>
                     {facebookPageUrl ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
@@ -933,13 +912,13 @@ const Admin: React.FC = () => {
                   </div>
 
                   <p className="text-xs text-blue-800/80 leading-relaxed">
-                    Enter the URL of your Class's public Facebook Page (or Group). The Dashboard will automatically show the latest posts and timeline updates.
+                    Enter the URL of your Class Facebook Group (e.g. <code>https://www.facebook.com/groups/137851679602885</code>) or public Page. The Dashboard will automatically show the latest posts in read-only mode.
                   </p>
 
                   <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       type="url"
-                      placeholder="e.g., https://www.facebook.com/YourClassPage"
+                      placeholder="e.g., https://www.facebook.com/groups/137851679602885"
                       value={tempFacebookPageUrl}
                       onChange={e => setTempFacebookPageUrl(e.target.value)}
                       disabled={isReadOnly}
@@ -977,7 +956,7 @@ const Admin: React.FC = () => {
 
                   {fbSaveStatus === 'saved' && (
                     <p className="text-xs text-emerald-600 font-bold flex items-center gap-1">
-                      ✓ Class Facebook Page URL saved! The Dashboard feed is now updated.
+                      ✓ Class Facebook Group URL saved! The Dashboard feed is now synchronized.
                     </p>
                   )}
                   {fbSaveStatus === 'error' && (
@@ -987,146 +966,52 @@ const Admin: React.FC = () => {
                   )}
                 </div>
 
-                {!isReadOnly && (
-                <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/50 space-y-3">
-                  <h4 className="font-bold text-sm text-gray-800">Publish New Post / Announcement</h4>
-                  <form onSubmit={handleAddAnnouncement} className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Post Title</label>
-                      <input 
-                        type="text" 
-                        placeholder="e.g. 35th Reunion Banquet Registration is Open!" 
-                        value={newAnnouncement.title} 
-                        onChange={e => setNewAnnouncement({...newAnnouncement, title: e.target.value})} 
-                        className="w-full border-gray-300 rounded-lg shadow-sm text-sm px-3 py-2" 
-                        required 
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Post Type</label>
-                        <select 
-                          value={newAnnouncement.type} 
-                          onChange={e => setNewAnnouncement({...newAnnouncement, type: e.target.value as 'text' | 'facebook'})} 
-                          className="w-full border-gray-300 rounded-lg shadow-sm text-sm px-3 py-2"
-                        >
-                            <option value="facebook">Facebook Post / Media</option>
-                            <option value="text">General Class Announcement</option>
-                        </select>
-                      </div>
-
-                      {newAnnouncement.type === 'facebook' ? (
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-1">Facebook Post URL</label>
-                          <input 
-                            type="url" 
-                            placeholder="https://www.facebook.com/..." 
-                            value={newAnnouncement.url} 
-                            onChange={e => setNewAnnouncement({...newAnnouncement, url: e.target.value})} 
-                            className="w-full border-gray-300 rounded-lg shadow-sm text-sm px-3 py-2" 
-                            required 
-                          />
-                        </div>
-                      ) : (
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-1">Image URL (Optional)</label>
-                          <input 
-                            type="url" 
-                            placeholder="https://example.com/photo.jpg" 
-                            value={newAnnouncement.imageUrl} 
-                            onChange={e => setNewAnnouncement({...newAnnouncement, imageUrl: e.target.value})} 
-                            className="w-full border-gray-300 rounded-lg shadow-sm text-sm px-3 py-2" 
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Content / Message</label>
-                      <textarea 
-                        placeholder="Write the announcement or post summary here..." 
-                        value={newAnnouncement.content} 
-                        onChange={e => setNewAnnouncement({...newAnnouncement, content: e.target.value})} 
-                        className="w-full border-gray-300 rounded-lg shadow-sm text-sm px-3 py-2" 
-                        rows={3}
-                      ></textarea>
-                    </div>
-
-                    {newAnnouncement.type === 'facebook' && (
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Featured Photo URL (Optional)</label>
-                        <input 
-                          type="url" 
-                          placeholder="https://example.com/photo.jpg" 
-                          value={newAnnouncement.imageUrl} 
-                          onChange={e => setNewAnnouncement({...newAnnouncement, imageUrl: e.target.value})} 
-                          className="w-full border-gray-300 rounded-lg shadow-sm text-sm px-3 py-2" 
-                        />
-                      </div>
-                    )}
-
-                    <div className="flex justify-end">
-                      <button 
-                        type="submit" 
-                        className="bg-brand-primary text-white text-xs font-bold py-2 px-5 rounded-lg hover:bg-brand-secondary shadow-sm transition-colors"
-                      >
-                        Publish to Dashboard
-                      </button>
-                    </div>
-                  </form>
+                {/* Read-Only Notice Box */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-700 space-y-1.5">
+                  <div className="flex items-center gap-2 font-bold text-slate-900">
+                    <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/></svg>
+                    <span>Read-Only Policy for Facebook Group Posts</span>
+                  </div>
+                  <p className="leading-relaxed">
+                    All announcements and feed posts are synchronized directly from Facebook and are set to <strong>READ-ONLY</strong> inside the Alumni Bookkeeping App. Posts cannot be created, updated, or deleted here. All posting, photo additions, and moderation are handled directly inside your Class Facebook Group on Facebook.
+                  </p>
                 </div>
-                )}
 
+                {/* Synchronized Posts List (Strictly Read-Only) */}
                 <div>
                     <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-bold text-sm text-gray-900">Current Dashboard Feed Posts ({announcements.length})</h4>
-                      <span className="text-xs text-gray-500">Dashboard displays the latest 10 posts</span>
+                      <h4 className="font-bold text-sm text-gray-900">Synchronized Facebook Posts ({announcements.length})</h4>
+                      <span className="text-xs text-gray-500 font-medium">Read-Only Stream</span>
                     </div>
 
-                    <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                        {announcements.slice(0, 15).map((ann, idx) => (
-                            <div key={ann.id} className="flex justify-between items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-100 transition-colors">
-                                <div className="min-w-0 pr-3">
+                    <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                        {announcements.slice(0, 10).map((ann, idx) => (
+                            <div key={ann.id || `admin-post-${idx}`} className="flex justify-between items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-100 transition-colors">
+                                <div className="min-w-0 pr-3 flex-1">
                                   <div className="flex items-center gap-2">
                                     <span className="text-[10px] font-bold bg-blue-100 text-[#1877F2] px-1.5 py-0.5 rounded">
                                       #{idx + 1}
                                     </span>
-                                    {ann.type === 'facebook' ? (
-                                      <span className="text-[10px] font-bold bg-[#1877F2]/10 text-[#1877F2] px-2 py-0.5 rounded-full">
-                                        Facebook
-                                      </span>
-                                    ) : (
-                                      <span className="text-[10px] font-bold bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full">
-                                        Text
-                                      </span>
-                                    )}
+                                    <span className="text-[10px] font-bold bg-[#1877F2]/10 text-[#1877F2] px-2 py-0.5 rounded-full">
+                                      Facebook Post
+                                    </span>
                                     <span className="text-xs text-gray-400">{formatDisplayDate(ann.date)}</span>
                                   </div>
                                   <p className="text-sm font-semibold text-gray-800 truncate mt-1">{ann.title}</p>
                                   {ann.url && (
                                     <a href={ann.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline truncate block">
-                                      {ann.url}
+                                      {ann.url} ↗
                                     </a>
                                   )}
                                 </div>
-                                {!isReadOnly && (
-                                  <button 
-                                    onClick={() => {
-                                      if (window.confirm('Delete this post?')) {
-                                        deleteAnnouncement(ann.id);
-                                      }
-                                    }} 
-                                    className="text-danger hover:text-red-700 text-xs font-semibold p-1.5 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-                                  >
-                                    Delete
-                                  </button>
-                                )}
+                                <span className="text-[11px] font-medium text-gray-400 bg-gray-200/70 px-2.5 py-1 rounded-md shrink-0">
+                                  Read-Only
+                                </span>
                             </div>
                         ))}
                         {announcements.length === 0 && (
-                          <div className="text-center py-6 border border-dashed rounded-xl text-gray-400 text-sm">
-                            No custom posts added yet. When you configure the Class Facebook Page URL above, it will be automatically featured on the Dashboard.
+                          <div className="text-center py-8 border border-dashed border-gray-200 rounded-xl text-gray-400 text-sm">
+                            No Facebook posts loaded yet. Click &quot;Sync 10 Posts&quot; above to load the latest group feed.
                           </div>
                         )}
                     </div>

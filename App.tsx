@@ -692,7 +692,18 @@ const App: React.FC = () => {
         ...doc.data()
       } as Announcement));
       loadedAnnouncements.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      setAnnouncements(loadedAnnouncements);
+      
+      // Deduplicate to ensure no duplicate titles appear
+      const seen = new Set<string>();
+      const uniqueAnnouncements: Announcement[] = [];
+      for (const item of loadedAnnouncements) {
+        const key = (item.title || '').trim().toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueAnnouncements.push(item);
+        }
+      }
+      setAnnouncements(uniqueAnnouncements);
     });
     return () => unsubscribe();
   }, [currentClassId]);
@@ -876,7 +887,16 @@ const App: React.FC = () => {
     if (!targetUrl) return 0;
     try {
       const generatedPosts = generateFacebookPostsForUrl(targetUrl, currentClassId, subtitle);
+      
+      // Delete existing announcements for this class to prevent duplicates
+      const existingSnap = await db.collection('announcements')
+        .where('classId', '==', currentClassId)
+        .get();
+
       const batch = db.batch();
+      existingSnap.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
       
       for (const p of generatedPosts) {
         const ref = db.collection('announcements').doc();
@@ -901,16 +921,9 @@ const App: React.FC = () => {
       await ref.set({ facebookPageUrl: trimmed }, { merge: true });
       setFacebookPageUrlState(trimmed);
 
-      // If Facebook URL is set and current announcements are empty, auto-sync the 10 posts!
+      // Auto-sync fresh 10 posts when a URL is configured
       if (trimmed) {
-        const currentAnnouncementsSnap = await db.collection('announcements')
-          .where('classId', '==', currentClassId)
-          .limit(1)
-          .get();
-
-        if (currentAnnouncementsSnap.empty) {
-          await syncFacebookPosts(trimmed);
-        }
+        await syncFacebookPosts(trimmed);
       }
     } catch (error) {
       console.error("Error setting Facebook Page URL:", error);

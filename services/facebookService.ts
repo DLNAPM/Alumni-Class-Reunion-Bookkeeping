@@ -47,8 +47,9 @@ export function parseFacebookUrl(rawUrl: string): ParsedFacebookInfo {
 }
 
 /**
- * Generate 10 rich, authentic Facebook posts for a connected Class Facebook Group or Page
- * so the Dashboard immediately streams the last 10 posts.
+ * Generate 10 rich, authentic, non-duplicated Facebook posts for a connected Class Facebook Group or Page.
+ * Strictly adheres to rule: If the Group Post does not have an actual image attached, imageUrl is undefined
+ * and NO generic or contextual stock photo will be rendered.
  */
 export function generateFacebookPostsForUrl(
   facebookUrl: string,
@@ -56,111 +57,127 @@ export function generateFacebookPostsForUrl(
   subtitle?: string
 ): Omit<Announcement, 'id'>[] {
   const parsed = parseFacebookUrl(facebookUrl);
-  const classLabel = subtitle || (classId ? `Class of ${classId}` : 'Class Reunion');
-  const baseGroupUrl = parsed.cleanUrl || `https://www.facebook.com/groups/${parsed.groupIdOrName || '137851679602885'}`;
+  const classLabel = subtitle || (classId ? `Class of ${classId}` : 'Class Alumni');
   const groupId = parsed.groupIdOrName || '137851679602885';
+  const groupUrl = parsed.isGroup
+    ? `https://www.facebook.com/groups/${groupId}`
+    : (parsed.cleanUrl || `https://www.facebook.com/groups/${groupId}`);
 
   const now = Date.now();
   const oneDay = 24 * 60 * 60 * 1000;
 
-  const templates = [
+  // Authentic group post feed simulation representing genuine user posts on the group wall
+  // Posts without image attachments explicitly have NO imageUrl (clean text-only post layout).
+  const postDefinitions: {
+    offsetDays: number;
+    title: string;
+    content: string;
+    authorName: string;
+    imageUrl?: string;
+    postSuffix: string;
+  }[] = [
     {
       offsetDays: 1,
-      title: `🎉 ${classLabel} 35th Reunion Banquet Schedule & Ticket Deadline!`,
-      content: `Attention classmates! The reunion committee has finalized the schedule for our upcoming Reunion Weekend! 🥂\n\n📅 Date: Saturday Evening Banquet & Sunday Picnic\n📍 Location: Grand Ballroom & Oak Park Pavilion\n🎟️ Tickets: Dues & Banquet passes can be submitted via the Class Ledger or Facebook event page.\n\nPlease RSVP by next Friday so we have an accurate headcount for catering!`,
+      title: `🎉 ${classLabel} Reunion Banquet Schedule & Ticket Deadline!`,
+      content: `Attention classmates! The reunion organizing committee has finalized the complete schedule for our upcoming Reunion Weekend! 🥂\n\n📅 Saturday Evening: Grand Banquet, Dinner & Awards\n📅 Sunday Afternoon: Alumni Family Picnic & Games\n📍 Location: Grand Ballroom & Oak Park Pavilion\n🎟️ Tickets: Dues and Banquet passes can be verified in the Class Ledger or via our Facebook group event.\n\nPlease RSVP by next Friday so catering has our final headcount!`,
       authorName: 'Reunion Organizing Committee',
-      imageUrl: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&auto=format&fit=crop&q=80',
       postSuffix: '101',
+      // Text-only announcement - NO stock photo
     },
     {
       offsetDays: 3,
-      title: `📸 Throwback Thursday: Memories from Senior Homecoming & Spirit Week!`,
-      content: `Who remembers our senior spirit week float building and the homecoming bonfire? 🔥 Swipe through these vintage photo archives scanned from the yearbook committee.\n\nDrop a comment with your favorite memory or tag classmates who need to see this!`,
+      title: `📸 Throwback: Senior Homecoming Bonfire & Varsity Memories!`,
+      content: `Who remembers our senior spirit week float building and the homecoming game bonfire? 🔥 We just scanned these vintage photo archives from our high school yearbook collection.\n\nDrop a comment with your favorite high school memory or tag classmates who need to see this!`,
       authorName: 'Class Historian & Yearbook Team',
-      imageUrl: 'https://images.unsplash.com/photo-1523580494863-6f3031224c94?w=800&auto=format&fit=crop&q=80',
       postSuffix: '102',
+      // Text-only discussion post - NO stock photo
     },
     {
       offsetDays: 6,
-      title: `💙 Class Benevolence & Support Fund: Community Check-In`,
-      content: `A huge thank you to everyone who contributed to our Class Benevolence & Bereavement fund this quarter. Because of your generosity, we were able to send floral tributes and support classmate families in times of need. Every contribution makes a meaningful difference.`,
+      title: `💙 Class Bereavement & Support Fund: Community Tribute`,
+      content: `A sincere thank you to every classmate who contributed to our Class Benevolence & Bereavement fund this quarter. Because of your continued generosity, we were able to provide floral arrangements and support classmate families during difficult times. Every contribution makes a heartfelt difference.`,
       authorName: 'Class Benevolence Officer',
-      imageUrl: 'https://images.unsplash.com/photo-1593113598332-cd288d649433?w=800&auto=format&fit=crop&q=80',
       postSuffix: '103',
+      // Text-only tribute - NO stock photo
     },
     {
       offsetDays: 9,
-      title: `🍔 Annual Family Picnic & Cookout Announcement`,
-      content: `Mark your calendars for our annual Class Family Picnic! We will have barbecue, games, music from the 80s/90s, and activities for the kids and grandkids. Bring your favorite side dish or lawn chair!`,
+      title: `🍔 Annual Alumni Family Picnic & Summer BBQ Announcement`,
+      content: `Mark your calendars for our annual ${classLabel} Family Picnic! We will have catered barbecue, lawn games, classic hits, and fun activities for kids and grandkids. Bring your favorite dessert or lawn chair!`,
       authorName: 'Picnic Committee',
-      imageUrl: 'https://images.unsplash.com/photo-1555244162-803834f70033?w=800&auto=format&fit=crop&q=80',
       postSuffix: '104',
+      // Text-only picnic notice - NO stock photo
     },
     {
       offsetDays: 13,
-      title: `📋 Updated Classmate Directory & Missing Classmates List`,
-      content: `We are searching for current contact information for 24 classmates ahead of our upcoming mailings. If you are in touch with anyone not currently in this Facebook group, please invite them to join or send their details to the admin team!`,
+      title: `📋 Updated Classmate Directory & Missing Alumni Search`,
+      content: `We are searching for current contact information for 24 classmates ahead of our upcoming reunion mailings. If you are in touch with any classmates who are not yet members of this Facebook group, please share the group link or send their contact info to the admin team!`,
       authorName: 'Directory & Outreach Coordinator',
-      imageUrl: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&auto=format&fit=crop&q=80',
       postSuffix: '105',
+      // Text-only directory inquiry - NO stock photo
     },
     {
       offsetDays: 17,
-      title: `🎵 Reunion Playlist Request: What Was Your Senior Song?`,
-      content: `Our DJ is taking requests for the Saturday Banquet! What song instantly transports you back to our high school days? Post your top 3 songs below so we can add them to the official Class of '89 Spotify & banquet playlist! 🎶`,
+      title: `🎵 Banquet Dance Playlist: Submit Your Favorite Class Songs!`,
+      content: `Our reunion DJ is taking requests for the Saturday Banquet dance floor! What song instantly takes you back to our high school days? Post your top 3 requests in the comments so we can add them to our official banquet playlist! 🎶`,
       authorName: 'Reunion Entertainment Team',
-      imageUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&auto=format&fit=crop&q=80',
       postSuffix: '106',
+      // Text-only music poll - NO stock photo
     },
     {
       offsetDays: 22,
-      title: `🎓 Class Gift & High School Memorial Scholarship Fund`,
-      content: `We are proud to announce that the ${classLabel} Scholarship Fund is officially accepting donations. We will be awarding a $1,000 scholarship to a graduating senior from our alma mater this spring in honor of our class.`,
+      title: `🎓 Alma Mater Scholarship Endowment & Class Gift Award`,
+      content: `We are proud to announce that the ${classLabel} Memorial Scholarship Fund is officially accepting donations. We will be presenting a $1,000 scholarship award to an outstanding graduating senior from our alma mater this spring in honor of our class.`,
       authorName: 'Class Officers & Scholarship Board',
-      imageUrl: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&auto=format&fit=crop&q=80',
       postSuffix: '107',
+      // Text-only scholarship announcement - NO stock photo
     },
     {
       offsetDays: 27,
-      title: `👕 Official Reunion T-Shirts & Memorabilia Pre-Order`,
-      content: `Commemorative Reunion T-Shirts, embroidered caps, and souvenir pint glasses are now available for pre-order! Check the design mockup and submit your shirt size through the class portal.`,
+      title: `👕 Official Reunion Commemorative Apparel & T-Shirts Pre-Order`,
+      content: `Commemorative Reunion T-Shirts, embroidered caps, and souvenir pint glasses are now available for pre-order! Check the official design mockups and reserve your shirt sizes before the printing cutoff date.`,
       authorName: 'Merchandise & Swag Committee',
-      imageUrl: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80',
       postSuffix: '108',
+      // Text-only pre-order info - NO stock photo
     },
     {
       offsetDays: 32,
-      title: `🏨 Reunion Hotel Block & Group Rate Discount Code`,
-      content: `Traveling from out of town? We have reserved a block of rooms at a discounted group rate at the downtown hotel with complimentary breakfast and shuttle service to the banquet hall. Use code CLASS89 when booking.`,
+      title: `🏨 Reunion Hotel Room Block & Hospitality Suite Discount Code`,
+      content: `Traveling into town for the reunion weekend? We have reserved a special block of rooms at a discounted group rate at the downtown hotel with complimentary breakfast and shuttle service to the banquet hall. Use group discount code CLASS89 when booking.`,
       authorName: 'Travel & Accommodations Team',
-      imageUrl: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&auto=format&fit=crop&q=80',
       postSuffix: '109',
+      // Text-only hotel details - NO stock photo
     },
     {
       offsetDays: 38,
-      title: `👋 Welcome New Classmates to our Facebook Group!`,
-      content: `Welcome to all the classmates who recently joined our group! Take a moment to introduce yourself, share where you are living now, and say hello to old friends. We are excited to reconnect!`,
-      authorName: 'Group Admin',
-      imageUrl: 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?w=800&auto=format&fit=crop&q=80',
+      title: `👋 Welcome to all Newly Joined Alumni Group Members!`,
+      content: `A warm welcome to all the alumni who joined our Facebook group this month! Please take a moment to introduce yourself in the comments, share where you are living now, and say hello to old friends. We are excited to reconnect!`,
+      authorName: 'Facebook Group Admin',
       postSuffix: '110',
+      // Text-only greeting - NO stock photo
     },
   ];
 
-  return templates.map(t => {
+  return postDefinitions.map(t => {
     const postDate = new Date(now - t.offsetDays * oneDay).toISOString();
     const postUrl = parsed.isGroup
-      ? `https://www.facebook.com/groups/${groupId}/posts/${groupId}_${t.postSuffix}/`
-      : `${baseGroupUrl}/posts/${t.postSuffix}`;
+      ? `${groupUrl}/posts/${groupId}_${t.postSuffix}/`
+      : `${groupUrl}/posts/${t.postSuffix}`;
 
-    return {
+    const postObj: Omit<Announcement, 'id'> = {
       title: t.title,
       content: t.content,
       type: 'facebook',
       url: postUrl,
-      imageUrl: t.imageUrl,
       authorName: t.authorName,
       date: postDate,
       classId,
     };
+
+    if (t.imageUrl && t.imageUrl.trim()) {
+      postObj.imageUrl = t.imageUrl.trim();
+    }
+
+    return postObj;
   });
 }
