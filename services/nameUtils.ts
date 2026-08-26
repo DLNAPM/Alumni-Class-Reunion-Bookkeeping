@@ -108,3 +108,20 @@ export const deriveNameFromEmail = (email?: string): string => {
     .join(' ');
   return formatToLastFirst(capitalized);
 };
+
+/**
+ * Hardcoded Super User Accounts that bypass profile merging, standardizing, and onboarding flows.
+ */
+export const SUPER_ADMIN_EMAILS = [
+  'dues_beachhigh89@comcast.net',
+  'dlaniger.napm.consulting@gmail.com'
+];
+
+/**
+ * Checks if an email belongs to a designated Super User Account.
+ */
+export const isSuperUserEmail = (email?: string | null): boolean => {
+  if (!email) return false;
+  const lower = email.toLowerCase().trim();
+  return SUPER_ADMIN_EMAILS.some(e => e.toLowerCase() === lower);
+};

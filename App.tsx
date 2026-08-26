@@ -17,7 +17,7 @@ import ReceiptDashboardModal from './components/ReceiptDashboardModal';
 import ClassmateOnboardingModal from './components/ClassmateOnboardingModal';
 import { auth, db, storage, FirebaseUser, Timestamp } from './firebase';
 import type { User, Transaction, Announcement, IntegrationSettings, IntegrationService, Classmate, UserRole } from './types';
-import { formatToLastFirst, isNameMatch, deriveNameFromEmail } from './services/nameUtils';
+import { formatToLastFirst, isNameMatch, deriveNameFromEmail, isSuperUserEmail, SUPER_ADMIN_EMAILS } from './services/nameUtils';
 import { 
   parseFacebookUrl, 
   loginAdminWithFacebook, 
@@ -29,7 +29,7 @@ import {
 } from './services/facebookService';
 import firebase from 'firebase/compat/app';
 
-// Hardcoded Super Admin Email
+// Hardcoded Super Admin Email (Legacy constant for backwards compatibility)
 const SUPER_ADMIN_EMAIL = 'dues_beachhigh89@comcast.net';
 
 const App: React.FC = () => {
@@ -203,7 +203,7 @@ const App: React.FC = () => {
 
         // User is logged in, check for class associations
         const email = u.email?.toLowerCase() || '';
-        const isSuperAdmin = email === SUPER_ADMIN_EMAIL.toLowerCase();
+        const isSuperAdmin = isSuperUserEmail(email);
 
         // Check if user has existing classmate records
         const snapshot = await db.collection('classmates').where('email', '==', u.email).get();
@@ -356,8 +356,9 @@ const App: React.FC = () => {
     const fetchUserProfile = async () => {
       const email = firebaseUser.email?.toLowerCase() || '';
 
-      // 1. Check if user is the Super Admin
-      if (email === SUPER_ADMIN_EMAIL.toLowerCase()) {
+      // 1. Check if user is the Super Admin / Super User Account (e.g. dlaniger.napm.consulting@gmail.com)
+      // Super Users are NEVER prompted to merge or standardize with any profile
+      if (isSuperUserEmail(email)) {
         const adminProfile: User = {
           id: firebaseUser.uid,
           name: firebaseUser.displayName || 'Super Admin',
@@ -366,7 +367,7 @@ const App: React.FC = () => {
           role: 'Admin',
         };
         
-        // Try to fetch additional details
+        // Try to fetch additional details from classmate record if one exists, without forcing changes
         try {
            const snapshot = await db.collection('classmates')
                .where('email', '==', firebaseUser.email)
@@ -376,10 +377,16 @@ const App: React.FC = () => {
                const data = snapshot.docs[0].data();
                adminProfile.address = data.address;
                adminProfile.phone = data.phone;
-               adminProfile.name = data.name;
+               adminProfile.name = data.name || adminProfile.name;
            }
         } catch(e) { console.warn("Could not fetch super admin details", e); }
         
+        // Explicitly ensure onboarding modal is closed and never triggered for Super Users
+        setOnboardingModal({
+          isOpen: false,
+          mode: 'complete',
+          matchingClassmates: [],
+        });
         setUser(adminProfile);
         return;
       }
@@ -993,7 +1000,7 @@ const App: React.FC = () => {
     
     let docId = user.id;
 
-    if (user.isAdmin && user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+    if (user.isAdmin && isSuperUserEmail(user.email)) {
         const snapshot = await db.collection('classmates')
             .where('email', '==', user.email)
             .where('classId', '==', currentClassId)

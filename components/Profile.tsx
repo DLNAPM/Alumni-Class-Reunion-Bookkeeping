@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../context/DataContext';
-import { formatToLastFirst } from '../services/nameUtils';
+import { formatToLastFirst, isSuperUserEmail } from '../services/nameUtils';
 
 const Profile: React.FC = () => {
   const { user, updateUserProfile } = useData();
@@ -63,9 +63,10 @@ const Profile: React.FC = () => {
       return;
     }
 
-    const standardizedName = formatToLastFirst(trimmedName);
+    const isSuper = isSuperUserEmail(user.email);
+    const resolvedName = isSuper ? trimmedName : formatToLastFirst(trimmedName);
 
-    if (standardizedName !== user.name && window.confirm(`You are changing your Display Name to "${standardizedName}". This will update your historical transactions to match your new name. Continue?`) === false) {
+    if (!isSuper && resolvedName !== user.name && window.confirm(`You are changing your Display Name to "${resolvedName}". This will update your historical transactions to match your new name. Continue?`) === false) {
       return;
     }
     
@@ -76,7 +77,7 @@ const Profile: React.FC = () => {
     setStatus('saving');
     
     updateUserProfile({
-      name: standardizedName,
+      name: resolvedName,
       email: trimmedEmail,
       phone: trimmedPhone,
       address: trimmedAddress,
