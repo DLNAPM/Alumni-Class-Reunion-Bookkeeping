@@ -434,60 +434,6 @@ const Dashboard: React.FC = () => {
           {/* Connected Facebook Group Live Portal */}
           {facebookPageUrl && (
             <div className="space-y-6">
-              {/* Admin Facebook Auth & Sync Control Bar */}
-              <div className="bg-white p-4 rounded-2xl border border-blue-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className={`w-3.5 h-3.5 rounded-full ${isFbAdminLoggedIn ? 'bg-emerald-500' : 'bg-amber-400'} animate-pulse`}></div>
-                  <div>
-                    <h4 className="font-bold text-sm text-gray-900 flex items-center gap-2">
-                      <span>{isFbAdminLoggedIn ? `Connected to Facebook (${fbAdminName || 'Admin'})` : 'Admin Facebook Authentication Required'}</span>
-                    </h4>
-                    <p className="text-xs text-gray-500">
-                      {isFbAdminLoggedIn 
-                        ? 'Admin is authenticated to fetch the 10 most recent posts from the Facebook feed.' 
-                        : 'Admin must log into Facebook to authorize and fetch the 10 most recent posts.'}
-                    </p>
-                  </div>
-                </div>
-
-                {isAdmin && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {isFbAdminLoggedIn ? (
-                      <button
-                        type="button"
-                        onClick={handleAdminRefreshSync}
-                        disabled={isSyncingFb}
-                        className="bg-[#1877F2] hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow inline-flex items-center gap-1.5 disabled:opacity-50"
-                      >
-                        <svg className={`w-3.5 h-3.5 ${isSyncingFb ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                        <span>{isSyncingFb ? 'Fetching Posts...' : 'Refresh 10 Latest Posts'}</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleAdminFbLoginAndSync}
-                        disabled={isSyncingFb}
-                        className="bg-[#1877F2] hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow inline-flex items-center gap-2 disabled:opacity-50"
-                      >
-                        <div className="w-4 h-4 rounded bg-white text-[#1877F2] font-black text-[10px] flex items-center justify-center">f</div>
-                        <span>{isSyncingFb ? 'Authenticating & Fetching...' : 'Log in with FB to Fetch 10 Posts'}</span>
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {fbSyncMessage && (
-                <div className={`p-3.5 rounded-xl text-xs font-medium ${
-                  fbSyncMessage.type === 'success' 
-                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
-                    : 'bg-red-50 text-red-800 border border-red-200'
-                }`}>
-                  {fbSyncMessage.type === 'success' ? '✓ ' : '⚠️ '}
-                  {fbSyncMessage.text}
-                </div>
-              )}
-
               {/* 10 Most Recent Posts Section */}
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
