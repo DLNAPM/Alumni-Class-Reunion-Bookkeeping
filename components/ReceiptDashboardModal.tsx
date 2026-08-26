@@ -4,6 +4,7 @@ import { useData } from '../context/DataContext';
 import { db } from '../firebase';
 import { formatDisplayDate, formatReceiptDate } from '../services/dateUtils';
 import { formatToLastFirst, normalizeNameTokens } from '../services/nameUtils';
+import { ClassmateModalSelector } from './ClassmateModalSelector';
 
 /**
  * Strict and format-aware comparison between transaction classmateName and target classmate.
@@ -352,21 +353,16 @@ const ReceiptDashboardModal: React.FC<ReceiptDashboardModalProps> = ({
                 <label className="text-[11px] text-gray-300 uppercase tracking-wider font-bold hidden sm:inline">
                   Classmate:
                 </label>
-                <select
-                  value={activeDisplayName}
-                  onChange={(e) => {
-                    const newName = e.target.value;
+                <ClassmateModalSelector
+                  allClassmateNames={allClassmateNames}
+                  selectedName={activeDisplayName}
+                  onSelectName={(newName) => {
                     setSelectedClassmateName(newName);
                     setSelectedTxId(undefined); // Clear transaction ID so it selects the first tx of the new classmate
                   }}
-                  className="bg-white/15 text-white text-xs font-semibold rounded-xl px-3 py-2 border border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer max-w-xs truncate"
-                >
-                  {allClassmateNames.map(name => (
-                    <option key={name} value={name} className="bg-gray-800 text-white">
-                      👤 {name}
-                    </option>
-                  ))}
-                </select>
+                  classmates={classmates}
+                  transactions={allAvailableTxs}
+                />
               </div>
             ) : (
               <div className="bg-white/10 text-white text-xs font-semibold rounded-xl px-3 py-2 border border-white/20 flex items-center gap-1.5">

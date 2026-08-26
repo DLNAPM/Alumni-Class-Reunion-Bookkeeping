@@ -55,18 +55,20 @@ const Transactions: React.FC = () => {
     return sortConfig.direction === 'asc' ? '▲' : '▼';
   };
 
+  const isAdmin = Boolean(user?.isAdmin || user?.role === 'Admin');
+
   return (
     <div className="bg-white p-6 sm:p-8 rounded-lg shadow-md">
       <div className="sm:flex sm:items-center sm:justify-between mb-6 gap-4">
         <div>
           <h2 className="text-2xl font-bold text-brand-text">My Transaction History</h2>
-          <p className="text-xs text-gray-500 mt-1">View, print, and share your official class payment receipts.</p>
+          <p className="text-xs text-gray-500 mt-1">View, print, and share official class payment receipts.</p>
         </div>
 
         <div className="mt-4 sm:mt-0 flex items-center gap-3 flex-wrap">
-          {user?.name && (
+          {(user?.name || isAdmin) && (
             <button
-              onClick={() => openReceiptDashboard?.(user.name)}
+              onClick={() => openReceiptDashboard?.(user?.name || 'Classmate')}
               className="bg-brand-primary text-white hover:bg-brand-secondary text-xs font-bold px-4 py-2 rounded-lg shadow-xs transition-colors flex items-center gap-1.5"
             >
               📄 Open Receipt Dashboard
