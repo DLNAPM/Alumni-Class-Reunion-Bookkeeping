@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { formatToLastFirst, isSuperUserEmail } from '../services/nameUtils';
+import { formatLastLoginDateTime } from '../services/dateUtils';
 
 const Profile: React.FC = () => {
   const { user, updateUserProfile } = useData();
@@ -125,9 +126,12 @@ const Profile: React.FC = () => {
             <h2 className="text-2xl font-extrabold text-brand-text">My Profile</h2>
             <p className="text-xs text-gray-500 mt-0.5">Manage your personal alumni contact and address details.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
               Role: {user.role === 'Admin_ro' ? 'Read-Only Admin' : user.role}
+            </span>
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-50 text-gray-700 border border-gray-200">
+              Last Login: {formatLastLoginDateTime(user.lastLogin)}
             </span>
           </div>
         </div>

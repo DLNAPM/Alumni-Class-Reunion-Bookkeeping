@@ -61,6 +61,7 @@ export interface User {
   role: UserRole;
   address?: string;
   phone?: string;
+  lastLogin?: string;
 }
 
 export interface Classmate {
@@ -72,6 +73,7 @@ export interface Classmate {
     address?: string;
     phone?: string;
     status: 'Active' | 'Inactive';
+    lastLogin?: string;
 }
 
 export interface IntegrationService {

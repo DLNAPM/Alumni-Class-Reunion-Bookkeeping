@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { Classmate } from '../types';
+import { formatLastLoginDateTime } from '../services/dateUtils';
 
 interface EditModalProps {
     classmate: Classmate;
@@ -47,6 +48,10 @@ const EditClassmateModal: React.FC<EditModalProps> = ({ classmate, onSave, onClo
                      <div>
                         <label htmlFor="address" className="block text-sm font-medium text-gray-700">Home Address</label>
                         <textarea id="address" name="address" value={formData.address || ''} onChange={handleChange} rows={3} className="mt-1 w-full border-gray-300 rounded-md shadow-sm focus:ring-brand-secondary focus:border-brand-secondary"></textarea>
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-gray-700">Last Login</label>
+                        <input type="text" value={formatLastLoginDateTime(classmate.lastLogin)} disabled className="mt-1 w-full border-gray-300 rounded-md shadow-sm bg-gray-100 text-gray-600 text-sm cursor-not-allowed" />
                     </div>
                      <div>
                         <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
@@ -150,9 +155,9 @@ const Classmates: React.FC = () => {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
     
-    // Search state for Mobile Number, Email Address, Home Address, or Name
+    // Search state for Mobile Number, Email Address, Home Address, Last Login, or Name
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchField, setSearchField] = useState<'all' | 'name' | 'phone' | 'email' | 'address'>('all');
+    const [searchField, setSearchField] = useState<'all' | 'name' | 'phone' | 'email' | 'address' | 'last_login'>('all');
 
     const selectAllRef = useRef<HTMLInputElement>(null);
     
@@ -172,12 +177,16 @@ const Classmates: React.FC = () => {
             const rawPhone = (c.phone || '').toLowerCase();
             const phoneMatch = rawPhone.includes(q) || (cleanQuery.length >= 3 && cleanDigits(c.phone).includes(cleanQuery));
 
+            const lastLoginStr = (c.lastLogin ? formatLastLoginDateTime(c.lastLogin) : 'NA').toLowerCase();
+            const lastLoginMatch = lastLoginStr.includes(q);
+
             if (searchField === 'name') return nameMatch;
             if (searchField === 'phone') return phoneMatch;
             if (searchField === 'email') return emailMatch;
             if (searchField === 'address') return addressMatch;
+            if (searchField === 'last_login') return lastLoginMatch;
 
-            return nameMatch || emailMatch || phoneMatch || addressMatch;
+            return nameMatch || emailMatch || phoneMatch || addressMatch || lastLoginMatch;
         });
     }, [classmates, searchQuery, searchField]);
 
@@ -299,6 +308,7 @@ const Classmates: React.FC = () => {
                                 <option value="phone">📱 Mobile Number</option>
                                 <option value="email">✉️ Email Address</option>
                                 <option value="address">🏠 Home Address</option>
+                                <option value="last_login">🕒 Last Login</option>
                             </select>
                         </div>
                     </div>
@@ -309,7 +319,7 @@ const Classmates: React.FC = () => {
                                 <span>
                                     Showing <strong>{filteredClassmates.length}</strong> of <strong>{classmates.length}</strong> classmate profile(s) matching <strong>"{searchQuery}"</strong>
                                     {searchField !== 'all' && (
-                                        <span> in <em>{searchField === 'phone' ? 'Mobile Number' : searchField === 'email' ? 'Email Address' : searchField === 'address' ? 'Home Address' : 'Name'}</em></span>
+                                        <span> in <em>{searchField === 'phone' ? 'Mobile Number' : searchField === 'email' ? 'Email Address' : searchField === 'address' ? 'Home Address' : searchField === 'last_login' ? 'Last Login' : 'Name'}</em></span>
                                     )}
                                 </span>
                             </div>
@@ -357,6 +367,7 @@ const Classmates: React.FC = () => {
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email (Login)</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mobile Number</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Home Address</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last_Login</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                                 <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -389,6 +400,17 @@ const Classmates: React.FC = () => {
                                     <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title={classmate.address || ''}>
                                         {classmate.address || <span className="text-gray-300 italic">Not set</span>}
                                     </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                        {classmate.lastLogin ? (
+                                            <span className="inline-flex items-center text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 px-2 py-1 rounded-md">
+                                                {formatLastLoginDateTime(classmate.lastLogin)}
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+                                                NA
+                                            </span>
+                                        )}
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${classmate.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                             {classmate.status}
@@ -419,7 +441,7 @@ const Classmates: React.FC = () => {
                             ))}
                             {filteredClassmates.length === 0 && (
                                 <tr>
-                                    <td colSpan={isReadOnly ? 6 : 8} className="text-center py-10 text-gray-500">
+                                    <td colSpan={isReadOnly ? 8 : 9} className="text-center py-10 text-gray-500">
                                         {searchQuery.trim() ? (
                                             <div>
                                                 <p className="text-gray-700 font-semibold mb-1">No classmates found matching "{searchQuery}"</p>

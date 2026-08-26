@@ -356,6 +356,8 @@ const App: React.FC = () => {
     const fetchUserProfile = async () => {
       const email = firebaseUser.email?.toLowerCase() || '';
 
+      const nowIso = new Date().toISOString();
+
       // 1. Check if user is the Super Admin / Super User Account (e.g. dlaniger.napm.consulting@gmail.com)
       // Super Users are NEVER prompted to merge or standardize with any profile
       if (isSuperUserEmail(email)) {
@@ -365,6 +367,7 @@ const App: React.FC = () => {
           email: firebaseUser.email!,
           isAdmin: true,
           role: 'Admin',
+          lastLogin: nowIso,
         };
         
         // Try to fetch additional details from classmate record if one exists, without forcing changes
@@ -374,10 +377,13 @@ const App: React.FC = () => {
                .where('classId', '==', currentClassId)
                .limit(1).get();
            if (!snapshot.empty) {
-               const data = snapshot.docs[0].data();
+               const doc = snapshot.docs[0];
+               const data = doc.data();
                adminProfile.address = data.address;
                adminProfile.phone = data.phone;
                adminProfile.name = data.name || adminProfile.name;
+               // Update lastLogin for super admin profile document
+               await doc.ref.update({ lastLogin: nowIso });
            }
         } catch(e) { console.warn("Could not fetch super admin details", e); }
         
@@ -407,6 +413,15 @@ const App: React.FC = () => {
             return;
           }
 
+          // Record lastLogin timestamp on the matched classmate profile
+          try {
+            await db.collection('classmates').doc(exactMatch.id).update({
+              lastLogin: nowIso,
+            });
+          } catch (e) {
+            console.warn("Could not record classmate lastLogin:", e);
+          }
+
           setUser({
             id: exactMatch.id,
             name: exactMatch.name,
@@ -415,6 +430,7 @@ const App: React.FC = () => {
             role: exactMatch.role,
             address: exactMatch.address,
             phone: exactMatch.phone,
+            lastLogin: nowIso,
           });
 
           // Check if there are other unmerged duplicate records matching their name in the ledger
@@ -516,6 +532,7 @@ const App: React.FC = () => {
 
         const allNamesToUpdate = new Set<string>([oldTargetName, standardizedName]);
 
+        const nowIso = new Date().toISOString();
         const batch = db.batch();
         batch.update(targetRef, {
           name: standardizedName,
@@ -523,6 +540,7 @@ const App: React.FC = () => {
           phone: data.phone,
           address: data.address,
           status: 'Active',
+          lastLogin: nowIso,
         });
 
         if (data.mergedSourceIds && data.mergedSourceIds.length > 0) {
@@ -557,6 +575,7 @@ const App: React.FC = () => {
           role: existingRole,
           phone: data.phone,
           address: data.address,
+          lastLogin: nowIso,
         };
         setUser(updatedUser);
       } else {
@@ -564,6 +583,7 @@ const App: React.FC = () => {
         const allSnap = await db.collection('classmates').where('classId', '==', currentClassId).limit(1).get();
         const isFirstUser = allSnap.empty;
         const role: UserRole = isFirstUser ? 'Admin' : 'Standard';
+        const nowIso = new Date().toISOString();
 
         const newDoc = await db.collection('classmates').add({
           name: standardizedName,
@@ -573,6 +593,7 @@ const App: React.FC = () => {
           status: 'Active',
           role: role,
           classId: currentClassId,
+          lastLogin: nowIso,
         });
         activeUserId = newDoc.id;
 
@@ -584,6 +605,7 @@ const App: React.FC = () => {
           role: role,
           phone: data.phone,
           address: data.address,
+          lastLogin: nowIso,
         };
         setUser(newUser);
       }

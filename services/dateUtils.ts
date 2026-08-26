@@ -115,3 +115,50 @@ export const getYearFromDateString = (dateVal: string | number | Date | null | u
   const parsed = parseLocalDate(dateVal);
   return parsed ? parsed.getFullYear().toString() : new Date().getFullYear().toString();
 };
+
+/**
+ * Formats a date/time representation for Last Login display.
+ * Returns formatted date and time (e.g. "8/26/2026, 1:24 PM") or "NA" if empty/never logged in.
+ */
+export const formatLastLoginDateTime = (dateVal: any): string => {
+  if (!dateVal) return 'NA';
+
+  let dateObj: Date | null = null;
+
+  if (dateVal instanceof Date) {
+    dateObj = isNaN(dateVal.getTime()) ? null : dateVal;
+  } else if (typeof dateVal === 'number') {
+    const d = new Date(dateVal);
+    dateObj = isNaN(d.getTime()) ? null : d;
+  } else if (typeof dateVal === 'object' && typeof dateVal.toDate === 'function') {
+    try {
+      dateObj = dateVal.toDate();
+    } catch {
+      dateObj = null;
+    }
+  } else if (typeof dateVal === 'object' && typeof dateVal.seconds === 'number') {
+    dateObj = new Date(dateVal.seconds * 1000);
+  } else if (typeof dateVal === 'string') {
+    const trimmed = dateVal.trim();
+    if (!trimmed || trimmed.toUpperCase() === 'NA' || trimmed.toUpperCase() === 'N/A') {
+      return 'NA';
+    }
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) {
+      dateObj = d;
+    }
+  }
+
+  if (!dateObj || isNaN(dateObj.getTime())) return 'NA';
+
+  const datePart = `${dateObj.getMonth() + 1}/${dateObj.getDate()}/${dateObj.getFullYear()}`;
+  let hours = dateObj.getHours();
+  const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const timePart = `${hours}:${minutes} ${ampm}`;
+
+  return `${datePart}, ${timePart}`;
+};
+
